@@ -7,6 +7,7 @@
 
 [![Play on GitHub Pages](https://img.shields.io/badge/Play-GitHub%20Pages-181717?style=for-the-badge&logo=github)](https://xyy277.github.io/fps-world/minecraft-fps.html)
 [![Play on Cloudflare](https://img.shields.io/badge/Play-Cloudflare%20Pages-F38020?style=for-the-badge&logo=cloudflare)](https://fps-world.pages.dev/minecraft-fps.html)
+[![View on GitHub](https://img.shields.io/badge/View-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/xyy277/fps-world)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](#-开源协议)
 [![Single File](https://img.shields.io/badge/single%20file-HTML-22c55e?style=for-the-badge)](minecraft-fps.html)
 
