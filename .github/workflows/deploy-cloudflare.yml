@@ -1,0 +1,41 @@
+name: Deploy to Cloudflare Pages
+
+# 触发条件：push 到 main 分支（与 GitHub Pages 同步）
+# GitHub Pages 由仓库 Settings → Pages 原生托管，push 即自动构建
+# 本工作流负责同步部署到 Cloudflare Pages，实现「push 即双部署」
+on:
+  push:
+    branches: [main]
+  # 支持手动触发，便于调试与重新部署
+  workflow_dispatch:
+
+# 防止并发部署，同一分支只跑最新一次
+concurrency:
+  group: cloudflare-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 部署到 Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 直接部署仓库根目录的静态文件，无需构建
+          # 项目名与本地部署一致，分支用 main 对应生产环境
+          command: pages deploy . --project-name=fps-world --branch=main --commit-dirty
+
+      - name: 输出部署结果
+        run: |
+          echo "✅ Cloudflare Pages 部署完成"
+          echo "🌐 访问地址: https://fps-world.pages.dev/minecraft-fps.html"
