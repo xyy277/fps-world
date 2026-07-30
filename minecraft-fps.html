@@ -161,6 +161,7 @@
     </table>
   </div>
   <button class="mc-btn small" id="touchToggle">📱 触屏按键模式</button>
+  <button class="mc-btn small" id="qualityBtn">🎨 画质：中</button>
   <button class="mc-btn" id="startBtn">开始游戏</button>
   <div class="tip">
     ⚠ 苦力怕靠近你会自爆，优先点杀！· TNT 可连锁引爆，炸丧尸效率一流<br>
@@ -202,6 +203,23 @@ function applyTouchMode() {
   const b = document.getElementById("touchToggle");
   if (b) b.textContent = "📱 触屏按键模式：" + (touchMode ? "开" : "关");
 }
+
+// ---------------- 画质分级（低/中/高，影响 pixelRatio/雾距/云数/粒子上限） ----------------
+// 移动端默认低画质，桌面端默认中画质；运行时可在设置面板切换并记忆
+const QUALITY_PRESETS = {
+  low:  { pixelRatio: 1,   fogNear: 20, fogFar: 60, clouds: 4,  partMax: 120, antialias: false },
+  mid:  { pixelRatio: 1.5, fogNear: 28, fogFar: 84, clouds: 8,  partMax: 240, antialias: true  },
+  high: { pixelRatio: 2,   fogNear: 32, fogFar: 96, clouds: 10, partMax: 400, antialias: true  },
+};
+let qualityKey = "mid";
+{
+  let stored = null;
+  try { stored = localStorage.getItem("fk_quality"); } catch (e) {}
+  if (stored && QUALITY_PRESETS[stored]) qualityKey = stored;
+  else qualityKey = touchMode ? "low" : "mid"; // 移动端默认低画质
+}
+let Q = QUALITY_PRESETS[qualityKey];
+// applyQuality 在渲染器/场景初始化后定义，用于运行时切换
 
 // ---------------- 基础常量 ----------------
 const W = 64, D = 64, H = 24;
@@ -321,14 +339,14 @@ const SKY_DAY = new THREE.Color(0x87ceeb);
 const SKY_NIGHT = new THREE.Color(0x0b1026);
 const skyTmp = new THREE.Color();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 32, 96);
+scene.fog = new THREE.Fog(0x87ceeb, Q.fogNear, Q.fogFar);
 
 const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 300);
 camera.rotation.order = "YXZ";
 scene.add(camera);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ antialias: Q.antialias });
+renderer.setPixelRatio(Q.pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
@@ -484,14 +502,26 @@ function setBlockAndRebuild(x, y, z, v) {
 
 // ---------------- 云 ----------------
 const clouds = [];
-{
-  const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, fog: true });
-  for (let i = 0; i < 10; i++) {
-    const c = new THREE.Mesh(new THREE.BoxGeometry(6 + Math.random() * 8, 1, 4 + Math.random() * 5), cm);
-    c.position.set(Math.random() * W, H - 3 + Math.random() * 4, Math.random() * D);
-    scene.add(c);
-    clouds.push(c);
-  }
+const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, fog: true });
+function makeCloud() {
+  const c = new THREE.Mesh(new THREE.BoxGeometry(6 + Math.random() * 8, 1, 4 + Math.random() * 5), cloudMat);
+  c.position.set(Math.random() * W, H - 3 + Math.random() * 4, Math.random() * D);
+  scene.add(c);
+  clouds.push(c);
+}
+for (let i = 0; i < Q.clouds; i++) makeCloud();
+// 运行时切换画质：调整像素比、雾距、云数量
+function applyQuality(key) {
+  if (!QUALITY_PRESETS[key]) return;
+  qualityKey = key;
+  Q = QUALITY_PRESETS[key];
+  try { localStorage.setItem("fk_quality", key); } catch (e) {}
+  renderer.setPixelRatio(Q.pixelRatio);
+  scene.fog.near = Q.fogNear;
+  scene.fog.far = Q.fogFar;
+  // 云数量增减
+  while (clouds.length > Q.clouds) { const c = clouds.pop(); scene.remove(c); c.geometry.dispose(); }
+  while (clouds.length < Q.clouds) makeCloud();
 }
 
 // ---------------- 音效 ----------------
@@ -593,13 +623,23 @@ function updateGunModel() {
   muzzleLight.position.z = GUNCFG[cur].mz - 0.06;
 }
 
-// ---------------- 粒子 & 弹道 ----------------
+// ---------------- 粒子 & 弹道（对象池，避免频繁创建/销毁） ----------------
 const partGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
-const particles = [];
+const particles = [];     // 活跃粒子
+const partPool = [];      // 闲置待复用的 Mesh
+const partMatCache = {};  // 按颜色缓存材质，避免重复创建
+function getPartMat(color) {
+  if (!partMatCache[color]) partMatCache[color] = new THREE.MeshBasicMaterial({ color });
+  return partMatCache[color];
+}
 function spawnParticles(x, y, z, color, n, spread) {
-  for (let i = 0; i < n; i++) {
-    const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color }));
+  const mat = getPartMat(color);
+  for (let i = 0; i < n && particles.length < Q.partMax; i++) {
+    const m = partPool.length ? partPool.pop() : new THREE.Mesh(partGeo, mat);
+    m.material = mat; // 复用 Mesh 时切换材质
     m.position.set(x + (Math.random() - 0.5) * 0.6, y + (Math.random() - 0.5) * 0.6, z + (Math.random() - 0.5) * 0.6);
+    m.scale.set(1, 1, 1);
+    m.visible = true;
     scene.add(m);
     particles.push({
       m,
@@ -618,8 +658,9 @@ function updateParticles(dt) {
     p.m.rotation.x += dt * 6; p.m.rotation.y += dt * 5;
     p.life -= dt;
     if (p.life <= 0) {
+      p.m.visible = false;
       scene.remove(p.m);
-      p.m.material.dispose();
+      partPool.push(p.m); // 回收复用，不 dispose 材质/几何
       particles.splice(i, 1);
     } else {
       const s = Math.min(1, p.life * 2.5);
@@ -627,10 +668,28 @@ function updateParticles(dt) {
     }
   }
 }
+// 弹道线条对象池
 const tracers = [];
+const tracerPool = [];
+const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9 });
+function getTracer() {
+  if (tracerPool.length) {
+    const line = tracerPool.pop();
+    line.visible = true;
+    line.material.opacity = 0.9;
+    return line;
+  }
+  // 预分配 2 顶点的 BufferGeometry，运行时只更新坐标
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
+  return new THREE.Line(geo, tracerMat);
+}
 function addTracer(a, b) {
-  const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
-  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.9 }));
+  const line = getTracer();
+  const arr = line.geometry.attributes.position.array;
+  arr[0] = a.x; arr[1] = a.y; arr[2] = a.z; arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
+  line.geometry.attributes.position.needsUpdate = true;
+  line.geometry.setDrawRange(0, 2);
   scene.add(line);
   tracers.push({ line, life: 0.07 });
 }
@@ -639,7 +698,12 @@ function updateTracers(dt) {
     const t = tracers[i];
     t.life -= dt;
     t.line.material.opacity = Math.max(0, t.life / 0.07) * 0.9;
-    if (t.life <= 0) { scene.remove(t.line); t.line.geometry.dispose(); t.line.material.dispose(); tracers.splice(i, 1); }
+    if (t.life <= 0) {
+      t.line.visible = false;
+      scene.remove(t.line);
+      tracerPool.push(t.line); // 回收复用，不 dispose
+      tracers.splice(i, 1);
+    }
   }
 }
 
@@ -1484,6 +1548,19 @@ $("touchToggle").addEventListener("click", () => {
   applyTouchMode();
 });
 applyTouchMode();
+// 画质切换按钮：循环 low → mid → high → low
+const QUALITY_LABEL = { low: "低", mid: "中", high: "高" };
+const QUALITY_ORDER = ["low", "mid", "high"];
+function updateQualityBtn() {
+  const b = $("qualityBtn");
+  if (b) b.textContent = "🎨 画质：" + QUALITY_LABEL[qualityKey];
+}
+updateQualityBtn();
+$("qualityBtn").addEventListener("click", () => {
+  const idx = QUALITY_ORDER.indexOf(qualityKey);
+  applyQuality(QUALITY_ORDER[(idx + 1) % QUALITY_ORDER.length]);
+  updateQualityBtn();
+});
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
