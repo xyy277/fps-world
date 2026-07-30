@@ -375,11 +375,13 @@ const PLACEABLE = [1, 2, 3, 7, 8, 9];
 // ---------------- 武器定义 ----------------
 // bloom: 每发增加的散布；bloomMax: 连发散布上限；bloomRecover: 每秒恢复量
 const WEAPONS = {
+  pistol:  { name: "手枪",   dmg: 22,  head: 44,  rate: 0.28, mag: 12, reload: 0.9,  spread: 0,    pellets: 1, kick: 0.06, bloom: 0.005, bloomMax: 0.03, bloomRecover: 0.20 },
   rifle:   { name: "步枪",   dmg: 35,  head: 70,  rate: 0.13, mag: 30, reload: 1.15, spread: 0,    pellets: 1, kick: 0.13, bloom: 0.010, bloomMax: 0.05, bloomRecover: 0.18 },
   shotgun: { name: "霰弹枪", dmg: 13,  head: 22,  rate: 0.75, mag: 6,  reload: 1.8,  spread: 0.06, pellets: 8, kick: 0.3,  bloom: 0.030, bloomMax: 0.10, bloomRecover: 0.25 },
   sniper:  { name: "狙击枪", dmg: 150, head: 300, rate: 1.15, mag: 5,  reload: 2.0,  spread: 0,    pellets: 1, kick: 0.26, bloom: 0.025, bloomMax: 0.07, bloomRecover: 0.15 },
+  rocket:  { name: "火箭筒", dmg: 120, head: 180, rate: 1.4,  mag: 1,  reload: 2.2,  spread: 0,    pellets: 1, kick: 0.5,  bloom: 0,      bloomMax: 0,    bloomRecover: 0,    splash: 4.5 },
 };
-const WORDER = ["rifle", "shotgun", "sniper"];
+const WORDER = ["pistol", "rifle", "shotgun", "sniper", "rocket"];
 
 // ---------------- 程序化像素纹理 ----------------
 const atlas = document.createElement("canvas");
@@ -707,6 +709,8 @@ const sfx = {
   shoot(w) {
     if (w === "shotgun") { noiseHit(0.2, 0.4); tone(140, 40, 0.2, "square", 0.15); }
     else if (w === "sniper") { noiseHit(0.12, 0.32); tone(900, 80, 0.14, "sawtooth", 0.12); }
+    else if (w === "rocket") { noiseHit(0.3, 0.5); tone(80, 30, 0.4, "sawtooth", 0.18); }
+    else if (w === "pistol") { noiseHit(0.06, 0.22); tone(220, 90, 0.06, "square", 0.08); }
     else { noiseHit(0.08, 0.28); tone(170, 60, 0.09, "square", 0.1); }
   },
   empty()   { tone(900, 700, 0.05, "square", 0.06); },
@@ -1221,8 +1225,62 @@ function buildCreeperModel(g, mats, legs) {
   const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.2, 0.03), faceM); mouth.position.set(0, 1.58, 0.27);
   g.add(body, head, eyeL, eyeR, mouth);
 }
-function spawnMob(wave) {
-  const type = (wave >= 2 && Math.random() < 0.3) ? "creeper" : "zombie";
+// P6.2：骷髅弓箭手——白色骨架，持弓，远程射击
+function buildSkeletonModel(g, mats, legs) {
+  const M = c => { const m = new THREE.MeshLambertMaterial({ color: c }); mats.push(m); return m; };
+  const bone = 0xe8e0c8, bow = 0x8b4513;
+  const legGeo = new THREE.BoxGeometry(0.16, 0.8, 0.16);
+  legGeo.translate(0, -0.4, 0);
+  const legL = new THREE.Mesh(legGeo, M(bone)); legL.position.set(-0.12, 0.8, 0);
+  const legR = new THREE.Mesh(legGeo, M(bone)); legR.position.set(0.12, 0.8, 0);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.24), M(bone)); body.position.y = 1.2;
+  const armGeo = new THREE.BoxGeometry(0.12, 0.5, 0.12);
+  armGeo.translate(0, -0.25, 0);
+  const armL = new THREE.Mesh(armGeo, M(bone)); armL.position.set(-0.28, 1.45, 0.15);
+  const armR = new THREE.Mesh(armGeo, M(bone)); armR.position.set(0.28, 1.45, 0.15); armR.rotation.x = -1.2; // 持弓姿势
+  const bowMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), M(bow)); bowMesh.position.set(0.34, 1.3, 0.3);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), M(bone)); head.position.y = 1.72;
+  const eyeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.03);
+  const eyeM = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const eyeL = new THREE.Mesh(eyeGeo, eyeM); eyeL.position.set(-0.1, 1.75, 0.22);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeM); eyeR.position.set(0.1, 1.75, 0.22);
+  g.add(legL, legR, body, armL, armR, bowMesh, head, eyeL, eyeR);
+  legs.push(legL, legR);
+}
+// P6.2：蜘蛛——黑色扁平，8 条腿，快速近战，可跳跃
+function buildSpiderModel(g, mats, legs) {
+  const M = c => { const m = new THREE.MeshLambertMaterial({ color: c }); mats.push(m); return m; };
+  const black = 0x1a1a1a, red = 0x8b0000;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.35, 0.5), M(black)); body.position.y = 0.45;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.35), M(black)); head.position.set(0, 0.45, 0.4);
+  // 8 条腿（4 左 4 右）
+  const legGeo = new THREE.BoxGeometry(0.08, 0.4, 0.08);
+  legGeo.translate(0, -0.2, 0);
+  for (let i = 0; i < 4; i++) {
+    const z = -0.15 + i * 0.15;
+    const legL = new THREE.Mesh(legGeo, M(black)); legL.position.set(-0.35, 0.6, z); legL.rotation.z = 0.4;
+    const legR = new THREE.Mesh(legGeo, M(black)); legR.position.set(0.35, 0.6, z); legR.rotation.z = -0.4;
+    g.add(legL, legR);
+    legs.push(legL, legR);
+  }
+  // 红色眼睛
+  const eyeM = new THREE.MeshBasicMaterial({ color: red });
+  const eyeGeo = new THREE.BoxGeometry(0.06, 0.06, 0.03);
+  const eyeL = new THREE.Mesh(eyeGeo, eyeM); eyeL.position.set(-0.08, 0.5, 0.58);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeM); eyeR.position.set(0.08, 0.5, 0.58);
+  g.add(body, head, eyeL, eyeR);
+}
+function spawnMob(wave, forceType) {
+  // P6.2：敌人类型随波次解锁——zombie(1+) / creeper(2+) / spider(3+) / skeleton(4+)
+  let type;
+  if (forceType) type = forceType;
+  else {
+    const r = Math.random();
+    if (wave >= 4 && r < 0.2) type = "skeleton";
+    else if (wave >= 3 && r < 0.4) type = "spider";
+    else if (wave >= 2 && r < 0.65) type = "creeper";
+    else type = "zombie";
+  }
   let x = 0, z = 0, tries = 0;
   do {
     x = 2.5 + Math.random() * (W - 5);
@@ -1233,17 +1291,26 @@ function spawnMob(wave) {
   const g = new THREE.Group();
   const mats = [], legs = [];
   if (type === "creeper") buildCreeperModel(g, mats, legs);
+  else if (type === "skeleton") buildSkeletonModel(g, mats, legs);
+  else if (type === "spider") buildSpiderModel(g, mats, legs);
   else buildZombieModel(g, mats, legs);
   g.position.set(x, surfaceY(x, z), z);
   scene.add(g);
 
+  // P6.2：各敌人属性差异化
+  const stats = {
+    zombie:   { hp: 100, headY: 1.45, height: 1.95, speed: 1.6 },
+    creeper:  { hp: 60,  headY: 1.5,  height: 2.0,  speed: 2.0 },
+    skeleton: { hp: 55,  headY: 1.6,  height: 1.95, speed: 1.4 }, // 远程，血薄
+    spider:   { hp: 40,  headY: 0.4,  height: 0.8,  speed: 3.2 }, // 快速近战，可跳
+  }[type];
   mobs.push({
     type, g, legs, mats,
-    hp: type === "creeper" ? 60 : 100, maxHp: type === "creeper" ? 60 : 100,
-    headY: type === "creeper" ? 1.5 : 1.45,
-    height: type === "creeper" ? 2.0 : 1.95,
-    speed: (type === "creeper" ? 2.0 : 1.6) + Math.min(wave * 0.12, 1.4) + Math.random() * 0.4,
+    hp: stats.hp, maxHp: stats.hp,
+    headY: stats.headY, height: stats.height,
+    speed: stats.speed + Math.min(wave * 0.12, 1.4) + Math.random() * 0.4,
     atkCd: 0, flashT: 0, fuse: 0, t: Math.random() * 10,
+    jumpCd: 0, // P6.2：蜘蛛跳跃冷却
     // FSM 状态机字段
     state: "chase",     // chase / attack / flee / wander
     path: null,         // A* 路径 waypoint 数组
@@ -1303,6 +1370,8 @@ function updateMobs(dt) {
     // creeper 自爆型不逃跑；zombie HP<30% 且近距离时逃跑
     if (m.type === "zombie" && m.hp < m.maxHp * 0.3 && dist < 5 && dist > 1.6) m.state = "flee";
     else if (m.type === "creeper" && m.fuse <= 0 && dist < 2.3) m.state = "attack";
+    else if (m.type === "skeleton" && dist < 14 && dist > 4) m.state = "attack"; // P6.2：骷髅远程攻击距离
+    else if (m.type === "spider" && dist < 1.4) m.state = "attack";
     else if (dist < 1.6) m.state = "attack";
     else if (dist > 28) m.state = "wander";
     else m.state = "chase";
@@ -1389,6 +1458,39 @@ function updateMobs(dt) {
         }
       } else if (m.state === "attack" && dist < 2.3) {
         m.fuse = 1.2;
+        sfx.hiss();
+      }
+    } else if (m.type === "skeleton") {
+      // P6.2：骷髅远程射箭——有视线且在攻击距离内时定期射击
+      m.atkCd -= dt;
+      if (m.state === "attack" && m.atkCd <= 0 && dist < 14) {
+        m.atkCd = 2.2; // 射击间隔
+        // 简易命中：距离越近命中率越高，70% 上限
+        const hitChance = Math.min(0.7, 0.3 + (14 - dist) / 14 * 0.4);
+        if (Math.random() < hitChance) {
+          damagePlayer(12);
+          sfx.hurt();
+        } else {
+          sfx.shoot("pistol"); // 箭矢飞行声近似
+        }
+        // 弹道特效（简易黄线）
+        addTracer(new THREE.Vector3(p.x, p.y + 1.5, p.z), new THREE.Vector3(pos.x, pos.y + 1.2, pos.z));
+      }
+    } else if (m.type === "spider") {
+      // P6.2：蜘蛛快速近战 + 周期性跳跃突进
+      m.atkCd -= dt;
+      m.jumpCd -= dt;
+      if (m.state === "attack" && dist < 1.4 && m.atkCd <= 0) {
+        m.atkCd = 0.8; // 攻速快
+        damagePlayer(6);
+      }
+      // 距离 4-8 且跳跃冷却结束：向前突进
+      if (m.state === "chase" && dist > 4 && dist < 8 && m.jumpCd <= 0) {
+        m.jumpCd = 4;
+        const jx = dx / dist, jz = dz / dist;
+        p.x += jx * 3; p.z += jz * 3; // 瞬移突进
+        p.x = Math.max(1.3, Math.min(W - 1.3, p.x));
+        p.z = Math.max(1.3, Math.min(D - 1.3, p.z));
         sfx.hiss();
       }
     } else {
@@ -1493,8 +1595,8 @@ let state = "menu";
 let locked = false;
 let health = 100, score = 0, kills = 0;
 let maxHp = 100; // 由升级系统修正（Phase 4.3）
-let cur = "rifle";
-const mags = { rifle: 30, shotgun: 6, sniper: 5 };
+let cur = "pistol"; // P6.1：初始武器改为手枪（随身备用）
+const mags = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5, rocket: 1 };
 let wave = 0, waveState = "clear", spawnTimer = 2.5;
 let reloading = false, reloadT = 0, reloadDur = 0; // reloadDur = 本次装填总时长（受升级影响）
 let shooting = false, fireCd = 0, gunKick = 0, flashT = 0, shakeT = 0;
@@ -1902,6 +2004,19 @@ function shoot() {
       }
     }
     addTracer(from, endPoint || new THREE.Vector3(o.x + dir.x * 60, o.y + dir.y * 60, o.z + dir.z * 60));
+  }
+  // P6.1：火箭筒范围伤害——在命中点或最大射程处引爆，对半径内敌人造成伤害
+  if (cur === "rocket" && w.splash) {
+    let cx, cy, cz;
+    // 用最后一发的 endPoint 或最远点作为爆炸中心
+    const lastDir = baseDir;
+    cx = o.x + lastDir.x * 30; cy = o.y + lastDir.y * 30; cz = o.z + lastDir.z * 30;
+    // 若有方块或敌人命中，用命中点
+    const bHit = rayVoxel(o.x, o.y, o.z, lastDir.x, lastDir.y, lastDir.z, 60);
+    if (bHit) { cx = o.x + lastDir.x * bHit.dist; cy = o.y + lastDir.y * bHit.dist; cz = o.z + lastDir.z * bHit.dist; }
+    explode(cx, cy, cz, w.splash, 60); // 复用 TNT 爆炸特效与范围伤害
+    sfx.explode();
+    shakeT = Math.max(shakeT, 0.4);
   }
   if (hitAny) { showHitmarker(headAny); headAny ? sfx.head() : sfx.hit(); }
   cleanupDead();
