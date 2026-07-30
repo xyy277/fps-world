@@ -115,6 +115,31 @@
   #settings-panel h2 { color: #fff; margin: 0 0 16px; }
   #settings-panel .row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; color: #ddd; }
   #settings-panel select, #settings-panel input { background: #1a1a1a; color: #fff; border: 1px solid #555; padding: 4px 8px; }
+  /* ===== Phase 4: 进度 / 成就 / 升级 ===== */
+  #progress-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; overflow: auto; }
+  #progress-panel .panel { background: #2a2a2a; border: 2px solid #555; padding: 24px 32px; min-width: 360px; max-width: 560px; }
+  #progress-panel h2 { color: #fff; margin: 0 0 12px; }
+  #progress-panel .stat-row { display: flex; justify-content: space-between; color: #ddd; padding: 6px 0; border-bottom: 1px solid #333; }
+  #progress-panel .stat-row b { color: #ffd833; }
+  #progress-panel .achv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; max-height: 300px; overflow-y: auto; }
+  .achv { background: #1a1a1a; padding: 8px 10px; border-left: 3px solid #555; font-size: 13px; color: #888; }
+  .achv.unlocked { border-left-color: #ffd833; color: #fff; }
+  .achv .achv-name { font-weight: bold; }
+  .achv .achv-desc { font-size: 11px; color: #999; }
+  .achv.unlocked .achv-desc { color: #ccc; }
+  #achv-toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); border: 2px solid #ffd833; color: #fff; padding: 12px 24px; font-size: 16px; display: none; z-index: 50; text-align: center; }
+  #achv-toast .achv-t-name { color: #ffd833; font-weight: bold; }
+  #level-bar { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); width: 220px; text-align: center; color: #fff; text-shadow: 1px 1px 0 #000; font-size: 12px; }
+  #level-bar .bar { height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #555; margin-top: 2px; }
+  #level-bar .fill { height: 100%; background: linear-gradient(#9fd66b, #5a9437); transition: width .3s; }
+  body.touch-mode #level-bar { bottom: 44px; width: 160px; }
+  #upgrade-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; }
+  #upgrade-panel .panel { background: #2a2a2a; border: 2px solid #555; padding: 24px 32px; min-width: 340px; }
+  #upgrade-panel h2 { color: #fff; margin: 0 0 8px; }
+  #upgrade-panel .up-row { display: flex; justify-content: space-between; align-items: center; margin: 14px 0; color: #ddd; }
+  #upgrade-panel .up-row button { background: #5a9437; color: #fff; border: none; padding: 4px 12px; cursor: pointer; font-family: inherit; }
+  #upgrade-panel .up-row button:disabled { background: #444; cursor: not-allowed; }
+  #upgrade-panel .pts { color: #ffd833; }
 </style>
 </head>
 <body>
@@ -140,6 +165,8 @@
   <div id="grenade" style="position:absolute;right:16px;bottom:46px;color:#9fd66b;text-shadow:2px 2px 0 #000;font-size:14px;">💣 3</div>
   <div id="hotbar"></div>
   <div id="banner"></div>
+  <div id="level-bar"><div id="level-text">Lv.1</div><div class="bar"><div class="fill" id="level-fill" style="width:0%"></div></div></div>
+  <div id="achv-toast"></div>
 </div>
 <div id="hurt"></div>
 
@@ -188,6 +215,8 @@
   <button class="mc-btn small" id="touchToggle">📱 触屏按键模式</button>
   <button class="mc-btn small" id="qualityBtn">🎨 画质：中</button>
   <button class="mc-btn small" id="settingsBtn">⚙ 设置</button>
+  <button class="mc-btn small" id="progressBtn">📊 进度</button>
+  <button class="mc-btn small" id="upgradeBtn">⬆ 升级</button>
   <button class="mc-btn" id="startBtn">开始游戏</button>
   <div class="tip">
     ⚠ 苦力怕靠近你会自爆，优先点杀！· TNT 可连锁引爆，炸丧尸效率一流<br>
@@ -199,6 +228,8 @@
   <h1>已暂停</h1>
   <button class="mc-btn" id="resumeBtn">继续游戏</button>
   <button class="mc-btn small" id="pauseSettingsBtn">⚙ 设置</button>
+  <button class="mc-btn small" id="pauseUpgradeBtn">⬆ 升级</button>
+  <button class="mc-btn small" id="pauseProgressBtn">📊 进度</button>
 </div>
 
 <div id="gameover" class="overlay">
@@ -217,6 +248,8 @@
     </table>
   </div>
   <button class="mc-btn" id="retryBtn">重新开始</button>
+  <button class="mc-btn small" id="go-upgradeBtn">⬆ 升级技能点</button>
+  <button class="mc-btn small" id="go-progressBtn">📊 查看进度</button>
 </div>
 
 <div id="settings-panel">
@@ -236,6 +269,33 @@
       <input type="range" id="set-sens" min="20" max="200" value="100">
     </div>
     <button class="mc-btn small" id="set-close" style="margin-top:16px;">关闭</button>
+  </div>
+</div>
+
+<div id="progress-panel">
+  <div class="panel">
+    <h2>📊 游戏进度</h2>
+    <div class="stat-row"><span>最高得分</span><b id="pp-score">0</b></div>
+    <div class="stat-row"><span>最高波次</span><b id="pp-wave">0</b></div>
+    <div class="stat-row"><span>总击杀数</span><b id="pp-kills">0</b></div>
+    <div class="stat-row"><span>总局数</span><b id="pp-games">0</b></div>
+    <div class="stat-row"><span>总爆头数</span><b id="pp-heads">0</b></div>
+    <div class="stat-row"><span>最佳连杀</span><b id="pp-streak">0</b></div>
+    <div class="stat-row"><span>已解锁成就</span><b id="pp-achv">0 / 0</b></div>
+    <h2 style="margin-top:16px;">🏆 成就</h2>
+    <div class="achv-grid" id="achv-grid"></div>
+    <button class="mc-btn small" id="pp-close" style="margin-top:16px;">关闭</button>
+  </div>
+</div>
+
+<div id="upgrade-panel">
+  <div class="panel">
+    <h2>⬆ 升级 (剩余点数: <span class="pts" id="up-pts">0</span>)</h2>
+    <div class="up-row"><span>伤害强化 (<b id="up-dmg-lv">0</b>/5) +10%每级</span><button id="up-dmg">+</button></div>
+    <div class="up-row"><span>最大生命 (<b id="up-hp-lv">0</b>/5) +15每级</span><button id="up-hp">+</button></div>
+    <div class="up-row"><span>换弹速度 (<b id="up-reload-lv">0</b>/5) -10%每级</span><button id="up-reload">+</button></div>
+    <div class="up-row"><span>移动速度 (<b id="up-speed-lv">0</b>/5) +8%每级</span><button id="up-speed">+</button></div>
+    <button class="mc-btn small" id="up-close" style="margin-top:16px;">关闭</button>
   </div>
 </div>
 
@@ -915,7 +975,7 @@ function melee() {
     if (dist > 2.6 || dist < 0.01) continue;
     const dot = (dx * fwd.x + dy * fwd.y + dz * fwd.z) / dist;
     if (dot < cosA) continue;
-    m.hp -= 65;
+    m.hp -= 65 * upStats.dmgMul; // Phase 4.3：近战伤害升级加成
     m.flashT = 0.12;
     m.lastHitBy = "melee";
     m.g.position.x += fwd.x * 0.4;
@@ -1100,6 +1160,12 @@ function killMob(i) {
   if (m.lastHitHead) killStats.head++;
   killStats.curStreak++;
   if (killStats.curStreak > killStats.streak) killStats.streak = killStats.curStreak;
+  // Phase 4.2：局内实时成就检测（合并当前局未入库的统计）
+  checkAchievements({
+    totalKills: save.totalKills + kills,
+    totalHeads: save.totalHeads + killStats.head,
+    bestStreak: Math.max(save.bestStreak, killStats.streak),
+  });
   const r = Math.random();
   if (m.type === "zombie" && r < 0.22) spawnDrop(p.x, surfaceY(p.x, p.z) + 0.35, p.z, "heart");
   else if (m.type === "creeper" && r < 0.3) spawnDrop(p.x, surfaceY(p.x, p.z) + 0.35, p.z, "ammo");
@@ -1250,7 +1316,7 @@ function updateDrops(dt) {
       const dist = Math.hypot(d.m.position.x - pos.x, d.m.position.z - pos.z);
       if (dist < 1.1 && Math.abs(d.m.position.y - (pos.y + 0.5)) < 2) {
         picked = true;
-        if (d.type === "heart") health = Math.min(100, health + 20);
+        if (d.type === "heart") health = Math.min(maxHp, health + 20);
         else mags[cur] = WEAPONS[cur].mag;
         sfx.pickup();
         updateHUD();
@@ -1314,10 +1380,11 @@ scene.add(highlight);
 let state = "menu";
 let locked = false;
 let health = 100, score = 0, kills = 0;
+let maxHp = 100; // 由升级系统修正（Phase 4.3）
 let cur = "rifle";
 const mags = { rifle: 30, shotgun: 6, sniper: 5 };
 let wave = 0, waveState = "clear", spawnTimer = 2.5;
-let reloading = false, reloadT = 0;
+let reloading = false, reloadT = 0, reloadDur = 0; // reloadDur = 本次装填总时长（受升级影响）
 let shooting = false, fireCd = 0, gunKick = 0, flashT = 0, shakeT = 0;
 let bloom = 0; // 当前动态散布（连发增大，停火恢复）
 let selSlot = 0, zoomed = false;
@@ -1413,6 +1480,113 @@ function addKillFeed(wpnName, mobType) {
 // 击杀统计追踪
 const killStats = { rifle: 0, shotgun: 0, sniper: 0, grenade: 0, melee: 0, head: 0, streak: 0, curStreak: 0 };
 function resetKillStats() { for (const k in killStats) killStats[k] = 0; killStats.curStreak = 0; }
+
+// ---------------- Phase 4: 存档 / 成就 / 升级 ----------------
+// 全局进度存档（跨局累积，localStorage 持久化）
+const SAVE_KEY = "fk_save_v1";
+const defaultSave = {
+  bestScore: 0, bestWave: 0, totalKills: 0, totalGames: 0, totalHeads: 0, bestStreak: 0,
+  achievements: {}, // id -> true
+  level: 1, xp: 0, skillPoints: 0,
+  upgrades: { dmg: 0, hp: 0, reload: 0, speed: 0 },
+};
+let save = loadSave();
+function loadSave() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s) return Object.assign({}, defaultSave, s, { achievements: s.achievements || {}, upgrades: Object.assign({}, defaultSave.upgrades, s.upgrades || {}) });
+  } catch (e) {}
+  return Object.assign({}, defaultSave);
+}
+function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+// 成就定义：id -> { name, desc, check(save, ctx) }
+const ACHIEVEMENTS = [
+  { id: "first_kill", name: "初次猎杀", desc: "击杀第一只怪物", check: s => s.totalKills >= 1 },
+  { id: "kill_50", name: "猎人", desc: "累计击杀 50 只怪物", check: s => s.totalKills >= 50 },
+  { id: "kill_200", name: "屠夫", desc: "累计击杀 200 只怪物", check: s => s.totalKills >= 200 },
+  { id: "wave_5", name: "生存者", desc: "坚持到第 5 波", check: s => s.bestWave >= 5 },
+  { id: "wave_10", name: "老练战士", desc: "坚持到第 10 波", check: s => s.bestWave >= 10 },
+  { id: "wave_20", name: "不屈之人", desc: "坚持到第 20 波", check: s => s.bestWave >= 20 },
+  { id: "score_500", name: "新兵", desc: "单局得分 500", check: s => s.bestScore >= 500 },
+  { id: "score_2000", name: "精英", desc: "单局得分 2000", check: s => s.bestScore >= 2000 },
+  { id: "score_5000", name: "传奇", desc: "单局得分 5000", check: s => s.bestScore >= 5000 },
+  { id: "head_50", name: "神射手", desc: "累计 50 次爆头", check: s => s.totalHeads >= 50 },
+  { id: "streak_10", name: "连杀大师", desc: "单局 10 连杀", check: s => s.bestStreak >= 10 },
+  { id: "games_10", name: "老兵", desc: "游玩 10 局", check: s => s.totalGames >= 10 },
+];
+const achvToastEl = $("achv-toast");
+let achvToastTimer = null;
+// ctx：可选的「实时上下文」——把当前局未入库的统计合并进 save 用于检测，
+// 这样击杀/爆头/连杀/波次/得分类成就可以在局内即时解锁并弹通知。
+function checkAchievements(ctx) {
+  const s = ctx ? Object.assign({}, save, ctx) : save;
+  for (const a of ACHIEVEMENTS) {
+    if (!save.achievements[a.id] && a.check(s)) {
+      save.achievements[a.id] = true;
+      showAchvToast(a);
+    }
+  }
+  writeSave();
+}
+function showAchvToast(a) {
+  achvToastEl.innerHTML = "🏆 成就解锁<br><span class='achv-t-name'>" + a.name + "</span><br><small>" + a.desc + "</small>";
+  achvToastEl.style.display = "block";
+  clearTimeout(achvToastTimer);
+  achvToastTimer = setTimeout(() => achvToastEl.style.display = "none", 3500);
+}
+
+// 升级系统：每局结束后根据击杀数结算 XP，升级给技能点
+// 升级公式：lv 所需 xp = lv * 100
+function xpForLevel(lv) { return lv * 100; }
+function gainXP(amount) {
+  save.xp += amount;
+  let leveled = false;
+  while (save.xp >= xpForLevel(save.level)) {
+    save.xp -= xpForLevel(save.level);
+    save.level++;
+    save.skillPoints++;
+    leveled = true;
+  }
+  if (leveled) {
+    showAchvToast({ name: "升级！Lv." + save.level, desc: "获得 1 技能点，可在菜单升级" });
+  }
+  writeSave();
+  updateLevelBar();
+}
+function updateLevelBar() {
+  $("level-text").textContent = "Lv." + save.level;
+  const need = xpForLevel(save.level);
+  $("level-fill").style.width = Math.min(100, (save.xp / need) * 100) + "%";
+}
+// 升级加成应用：返回修正后的属性
+function getUpgradedStats() {
+  const u = save.upgrades;
+  return {
+    dmgMul: 1 + u.dmg * 0.10,        // 伤害 +10% 每级
+    maxHp: 100 + u.hp * 15,          // 最大生命 +15 每级
+    reloadMul: 1 - u.reload * 0.10,  // 换弹时间 -10% 每级
+    speedMul: 1 + u.speed * 0.08,    // 移速 +8% 每级
+  };
+}
+// 当前生效的升级属性（每局开始时刷新；升级面板改动后也立即刷新）
+let upStats = getUpgradedStats();
+maxHp = upStats.maxHp; // 同步初始化（读取已有存档的 HP 升级）
+function refreshUpStats() { upStats = getUpgradedStats(); maxHp = upStats.maxHp; }
+
+// 局末结算：更新存档
+function finalizeGameStats() {
+  save.totalGames++;
+  save.totalKills += kills;
+  save.totalHeads += killStats.head;
+  if (score > save.bestScore) save.bestScore = score;
+  if (wave > save.bestWave) save.bestWave = wave;
+  if (killStats.streak > save.bestStreak) save.bestStreak = killStats.streak;
+  // XP：每击杀 10xp，每波 20xp
+  gainXP(kills * 10 + wave * 20);
+  checkAchievements();
+  writeSave();
+}
 // 小地图绘制
 const minimapCtx = $("minimap").getContext("2d");
 function drawMinimap() {
@@ -1457,7 +1631,7 @@ function updateHUD() {
   $("kills").textContent = kills;
   $("wave").textContent = wave === 0 ? "-" : wave;
   $("enemies").textContent = mobs.length;
-  $("health-fill").style.width = Math.max(0, health) + "%";
+  $("health-fill").style.width = Math.max(0, Math.min(100, health / maxHp * 100)) + "%";
   $("weapon").textContent = WEAPONS[cur].name + (cur === "sniper" ? (touchMode ? "（镜 瞄准）" : "（F 瞄准）") : "");
   if (reloading) { ammoEl.textContent = "装填中…"; ammoEl.className = "reloading"; }
   else { ammoEl.innerHTML = mags[cur] + " <small>/ ∞</small>"; ammoEl.className = ""; }
@@ -1510,6 +1684,7 @@ function gameOver() {
   state = "over";
   clearTouchInput();
   if (document.pointerLockElement) document.exitPointerLock();
+  finalizeGameStats(); // Phase 4.1：局末结算，写入存档/经验/成就
   $("final-stats").innerHTML =
     "最终得分 <b>" + score + "</b><br>坚持到第 <b>" + wave + "</b> 波<br>击杀怪物 <b>" + kills + "</b>";
   // 计分板：填充武器分布与统计
@@ -1589,7 +1764,7 @@ function shoot() {
       const m = mobs[best];
       const hy = o.y + dir.y * bestT;
       const isHead = hy > m.g.position.y + m.headY;
-      const dmg = isHead ? w.head : w.dmg;
+      const dmg = (isHead ? w.head : w.dmg) * upStats.dmgMul; // Phase 4.3：伤害升级加成
       m.hp -= dmg;
       m.lastHitBy = cur; m.lastHitHead = isHead; // 记录击杀来源
       m.flashT = 0.09;
@@ -1622,7 +1797,8 @@ function shoot() {
 function startReload() {
   if (reloading || mags[cur] === WEAPONS[cur].mag) return;
   reloading = true;
-  reloadT = WEAPONS[cur].reload;
+  reloadDur = WEAPONS[cur].reload * upStats.reloadMul; // Phase 4.3：换弹速度升级
+  reloadT = reloadDur;
   sfx.reload();
   updateHUD();
 }
@@ -1675,7 +1851,7 @@ function collideAxis(axis) {
 }
 function updatePlayer(dt) {
   const sprint = keys["ShiftLeft"] || keys["ShiftRight"] || dpad.sprint;
-  const speed = sprint ? 7.4 : 4.9;
+  const speed = (sprint ? 7.4 : 4.9) * upStats.speedMul; // Phase 4.3：移速升级
   let ix = 0, iz = 0;
   if (keys["KeyW"] || dpad.up) iz += 1;
   if (keys["KeyS"] || dpad.down) iz -= 1;
@@ -1726,12 +1902,11 @@ function updatePlayer(dt) {
   // 换弹动画：枪身下沉+旋转，sin 曲线 0→1→0
   if (reloading) {
     reloadT -= dt;
-    const w = WEAPONS[cur];
-    const p = 1 - reloadT / w.reload; // 进度 0→1
+    const p = 1 - reloadT / reloadDur; // 进度 0→1（用实际装填时长）
     const dip = Math.sin(p * Math.PI); // 0→1→0
     gun.position.y -= dip * 0.18;
     gun.rotation.z = dip * 0.35;
-    if (reloadT <= 0) { reloading = false; mags[cur] = w.mag; updateHUD(); }
+    if (reloadT <= 0) { reloading = false; mags[cur] = WEAPONS[cur].mag; updateHUD(); }
   }
 
   // bloom 衰减恢复（停火时更快恢复）
@@ -1772,9 +1947,14 @@ function updateWave(dt) {
     if (waveState === "fighting") {
       waveState = "clear";
       score += wave * 5;
-      health = Math.min(100, health + 25);
+      health = Math.min(maxHp, health + 25);
       banner("第 " + wave + " 波已清空！生命 +25");
       sfx.clear();
+      // Phase 4.2：波次/得分类成就实时检测
+      checkAchievements({
+        bestWave: Math.max(save.bestWave, wave),
+        bestScore: Math.max(save.bestScore, score),
+      });
       spawnTimer = 3;
       updateHUD();
     } else {
@@ -1982,6 +2162,9 @@ function startGame() {
   lookId = null;
 
   health = 100; score = 0; kills = 0;
+  refreshUpStats(); // Phase 4.3：刷新升级属性（maxHp/dmgMul/reloadMul/speedMul）
+  health = maxHp;   // 按升级后的最大生命开局
+  updateLevelBar(); // Phase 4.3：刷新等级条
   resetKillStats();
   grenadeAmmo = 3; meleeCd = 0; meleeT = 0;
   cur = "rifle";
@@ -2066,6 +2249,78 @@ function applyVolume() {
   const v = parseFloat(setVolumeIn.value) / 100;
   if (window._masterGain) window._masterGain.gain.value = v;
 }
+
+// ---------------- Phase 4.2 / 4.3 / 4.4：进度面板 / 升级面板 ----------------
+const progressPanel = $("progress-panel");
+const upgradePanel = $("upgrade-panel");
+// 升级项定义：与 save.upgrades 字段对应
+const UPGRADE_DEFS = [
+  { key: "dmg",    name: "伤害强化", max: 5, per: "+10% 伤害" },
+  { key: "hp",     name: "最大生命", max: 5, per: "+15 HP" },
+  { key: "reload", name: "换弹速度", max: 5, per: "-10% 装填" },
+  { key: "speed",  name: "移动速度", max: 5, per: "+8% 移速" },
+];
+// 填充进度面板：全局统计 + 成就墙
+function fillProgressPanel() {
+  $("pp-score").textContent = save.bestScore;
+  $("pp-wave").textContent = save.bestWave;
+  $("pp-kills").textContent = save.totalKills;
+  $("pp-games").textContent = save.totalGames;
+  $("pp-heads").textContent = save.totalHeads;
+  $("pp-streak").textContent = save.bestStreak;
+  const unlocked = ACHIEVEMENTS.filter(a => save.achievements[a.id]).length;
+  $("pp-achv").textContent = unlocked + " / " + ACHIEVEMENTS.length;
+  const grid = $("achv-grid");
+  grid.innerHTML = "";
+  for (const a of ACHIEVEMENTS) {
+    const got = !!save.achievements[a.id];
+    const el = document.createElement("div");
+    el.className = "achv" + (got ? " unlocked" : "");
+    el.innerHTML = "<div class='achv-name'>" + (got ? "🏆 " : "🔒 ") + a.name + "</div>" +
+      "<div class='achv-desc'>" + a.desc + "</div>";
+    grid.appendChild(el);
+  }
+}
+// 填充升级面板：当前等级 + 按钮可用状态
+function fillUpgradePanel() {
+  $("up-pts").textContent = save.skillPoints;
+  for (const d of UPGRADE_DEFS) {
+    $("up-" + d.key + "-lv").textContent = save.upgrades[d.key];
+    const btn = $("up-" + d.key);
+    btn.disabled = save.skillPoints <= 0 || save.upgrades[d.key] >= d.max;
+  }
+}
+function openProgress() { fillProgressPanel(); progressPanel.style.display = "flex"; }
+function closeProgress() { progressPanel.style.display = "none"; }
+function openUpgrade() { fillUpgradePanel(); upgradePanel.style.display = "flex"; }
+function closeUpgrade() { upgradePanel.style.display = "none"; }
+// 升级按钮：消耗 1 技能点 +1 等级，立即刷新属性并持久化
+function doUpgrade(key) {
+  const d = UPGRADE_DEFS.find(x => x.key === key);
+  if (!d || save.skillPoints <= 0 || save.upgrades[key] >= d.max) return;
+  save.upgrades[key]++;
+  save.skillPoints--;
+  writeSave();
+  refreshUpStats(); // 立即生效（下一局或当前局立即受益）
+  fillUpgradePanel();
+  sfx.pickup();
+}
+$("progressBtn").addEventListener("click", openProgress);
+$("pp-close").addEventListener("click", closeProgress);
+$("upgradeBtn").addEventListener("click", openUpgrade);
+$("up-close").addEventListener("click", closeUpgrade);
+$("up-dmg").addEventListener("click", () => doUpgrade("dmg"));
+$("up-hp").addEventListener("click", () => doUpgrade("hp"));
+$("up-reload").addEventListener("click", () => doUpgrade("reload"));
+$("up-speed").addEventListener("click", () => doUpgrade("speed"));
+// 游戏结束界面也提供「升级 / 进度」入口，方便局末分配技能点
+$("go-upgradeBtn").addEventListener("click", openUpgrade);
+$("go-progressBtn").addEventListener("click", openProgress);
+// 暂停界面同样提供入口
+$("pauseUpgradeBtn").addEventListener("click", openUpgrade);
+$("pauseProgressBtn").addEventListener("click", openProgress);
+// 初始刷新一次（菜单等级条 / 属性）
+updateLevelBar();
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
