@@ -861,6 +861,88 @@ function melee() {
   cleanupDead();
 }
 
+// ---------------- 怪物 AI：A* 寻路 + FSM 状态机 ----------------
+// 通行判断：该格地面以上 2 格须为空（mob 高约 2）
+function isWalkable(gx, gz) {
+  if (gx < 0 || gx >= W || gz < 0 || gz >= D) return false;
+  let gy = 0;
+  for (let y = H - 1; y >= 0; y--) { if (getBlock(gx, y, gz)) { gy = y + 1; break; } }
+  if (getBlock(gx, gy, gz) || getBlock(gx, gy + 1, gz)) return false;
+  return true;
+}
+// A* 寻路：返回 waypoint 数组 [{x,z},...]，限制搜索范围避免卡性能
+// 每次最多搜 range×range 节点，失败返回 null（回退直线追击）
+const PATH_RANGE = 10;
+function findPath(sx, sz, tx, tz) {
+  const gx0 = Math.floor(sx), gz0 = Math.floor(sz);
+  const gx1 = Math.floor(tx), gz1 = Math.floor(tz);
+  if (gx1 === gx0 && gz1 === gz0) return [];
+  const lo = -PATH_RANGE, hi = PATH_RANGE;
+  // 节点用对象，closed/open 用 Map 索引 "x,z"
+  const open = []; // 小顶堆用排序简化（节点数 ≤ 441）
+  const openMap = new Map(), closed = new Set();
+  const key = (x, z) => x + "," + z;
+  const start = { x: gx0, z: gz0, g: 0, f: Math.hypot(gx1 - gx0, gz1 - gz0), parent: null };
+  open.push(start); openMap.set(key(gx0, gz0), start);
+  const NEI = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  let iter = 0, maxIter = 500;
+  while (open.length && iter++ < maxIter) {
+    // 取 f 最小（简单排序，节点少可接受）
+    open.sort((a, b) => a.f - b.f);
+    const cur = open.shift();
+    openMap.delete(key(cur.x, cur.z));
+    if (cur.x === gx1 && cur.z === gz1) {
+      // 回溯路径
+      const path = [];
+      let n = cur;
+      while (n.parent) { path.push({ x: n.x + 0.5, z: n.z + 0.5 }); n = n.parent; }
+      path.reverse();
+      return path;
+    }
+    closed.add(key(cur.x, cur.z));
+    for (const [dx, dz] of NEI) {
+      const nx = cur.x + dx, nz = cur.z + dz;
+      if (nx - gx0 < lo || nx - gx0 > hi || nz - gz0 < lo || nz - gz0 > hi) continue;
+      const k = key(nx, nz);
+      if (closed.has(k)) continue;
+      if (!isWalkable(nx, nz)) continue;
+      // 对角线时禁止穿越障碍角
+      if (dx && dz && (!isWalkable(cur.x + dx, cur.z) || !isWalkable(cur.x, cur.z + dz))) continue;
+      const step = (dx && dz) ? 1.414 : 1;
+      const g = cur.g + step;
+      const existing = openMap.get(k);
+      if (existing && existing.g <= g) continue;
+      const node = { x: nx, z: nz, g, f: g + Math.hypot(gx1 - nx, gz1 - nz), parent: cur };
+      if (existing) { existing.g = g; existing.f = node.f; existing.parent = cur; }
+      else { open.push(node); openMap.set(k, node); }
+    }
+  }
+  return null; // 寻路失败
+}
+// 掩体查找：返回最近的"高墙侧面"坐标作为躲避点
+function findCover(sx, sz, fromX, fromZ) {
+  let best = null, bestD = Infinity;
+  for (let r = 2; r <= 6; r++) {
+    for (let a = 0; a < 8; a++) {
+      const ang = a * Math.PI / 4;
+      const cx = Math.floor(sx + Math.cos(ang) * r);
+      const cz = Math.floor(sz + Math.sin(ang) * r);
+      // 该格需有 ≥2 高的墙挡在玩家方向
+      let gy = 0;
+      for (let y = H - 1; y >= 0; y--) { if (getBlock(cx, y, cz)) { gy = y + 1; break; } }
+      if (gy < 2) continue;
+      if (!getBlock(cx, gy, cz) && getBlock(cx, gy - 1, cz) && !getBlock(cx, gy + 1, cz)) {
+        // 墙高 ≥2：检查墙在玩家方向
+        const wd = Math.hypot(fromX - cx, fromZ - cz);
+        const d = Math.hypot(sx - cx, sz - cz);
+        if (wd > 2 && d < bestD) { bestD = d; best = { x: cx + 0.5, z: cz + 0.5 }; }
+      }
+    }
+    if (best) break;
+  }
+  return best;
+}
+
 // ---------------- 怪物 ----------------
 const mobs = [];
 function buildZombieModel(g, mats, legs) {
@@ -921,11 +1003,17 @@ function spawnMob(wave) {
 
   mobs.push({
     type, g, legs, mats,
-    hp: type === "creeper" ? 60 : 100,
+    hp: type === "creeper" ? 60 : 100, maxHp: type === "creeper" ? 60 : 100,
     headY: type === "creeper" ? 1.5 : 1.45,
     height: type === "creeper" ? 2.0 : 1.95,
     speed: (type === "creeper" ? 2.0 : 1.6) + Math.min(wave * 0.12, 1.4) + Math.random() * 0.4,
     atkCd: 0, flashT: 0, fuse: 0, t: Math.random() * 10,
+    // FSM 状态机字段
+    state: "chase",     // chase / attack / flee / wander
+    path: null,         // A* 路径 waypoint 数组
+    pathT: 0,           // 路径重算计时
+    wanderT: 0,         // 巡逻计时
+    wanderDir: Math.random() * Math.PI * 2,
   });
 }
 function killMob(i) {
@@ -950,6 +1038,9 @@ function cleanupDead() {
 }
 function updateMobs(dt) {
   const nightBuff = curNightF > 0.99 ? 1.3 : 1;
+  // 估算玩家水平速度（用于预判），由上帧位置差得
+  const pvx = pos.x - lastPX, pvz = pos.z - lastPZ;
+  lastPX = pos.x; lastPZ = pos.z;
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i];
     m.t += dt;
@@ -957,26 +1048,84 @@ function updateMobs(dt) {
     const dx = pos.x - p.x, dz = pos.z - p.z;
     const dist = Math.hypot(dx, dz);
     const spd = m.speed * nightBuff;
-    if (dist > 1.15) {
-      p.x += (dx / dist) * spd * dt;
-      p.z += (dz / dist) * spd * dt;
+
+    // ===== FSM 状态决策 =====
+    // creeper 自爆型不逃跑；zombie HP<30% 且近距离时逃跑
+    if (m.type === "zombie" && m.hp < m.maxHp * 0.3 && dist < 5 && dist > 1.6) m.state = "flee";
+    else if (m.type === "creeper" && m.fuse <= 0 && dist < 2.3) m.state = "attack";
+    else if (dist < 1.6) m.state = "attack";
+    else if (dist > 28) m.state = "wander";
+    else m.state = "chase";
+
+    // ===== 状态执行：算出移动方向 moveX/moveZ =====
+    let moveX = 0, moveZ = 0;
+    switch (m.state) {
+      case "chase": {
+        // 预判：creeper 朝玩家预测位置移动（lead 0.3s），zombie 直追
+        let tx = pos.x, tz = pos.z;
+        if (m.type === "creeper") { tx += pvx * 0.3; tz += pvz * 0.3; }
+        m.pathT -= dt;
+        if (m.pathT <= 0 || !m.path) { m.path = findPath(p.x, p.z, tx, tz); m.pathT = 0.4; }
+        if (m.path && m.path.length) {
+          const wp = m.path[0];
+          const wdx = wp.x - p.x, wdz = wp.z - p.z, wd = Math.hypot(wdx, wdz);
+          if (wd < 0.6) m.path.shift();
+          else { moveX = wdx / wd; moveZ = wdz / wd; }
+        } else if (dist > 0.1) { moveX = dx / dist; moveZ = dz / dist; } // 寻路失败回退直线
+        break;
+      }
+      case "attack":
+        // 原地面对玩家，不移动
+        break;
+      case "flee": {
+        // 寻找掩体；无掩体则远离玩家
+        m.pathT -= dt;
+        if (m.pathT <= 0) {
+          const cover = findCover(p.x, p.z, pos.x, pos.z);
+          m.path = cover ? findPath(p.x, p.z, cover.x, cover.z) : null;
+          m.pathT = 0.6;
+        }
+        if (m.path && m.path.length) {
+          const wp = m.path[0];
+          const wdx = wp.x - p.x, wdz = wp.z - p.z, wd = Math.hypot(wdx, wdz);
+          if (wd < 0.6) m.path.shift();
+          else { moveX = wdx / wd; moveZ = wdz / wd; }
+        } else if (dist > 0.1) { moveX = -dx / dist; moveZ = -dz / dist; }
+        break;
+      }
+      case "wander": {
+        m.wanderT -= dt;
+        if (m.wanderT <= 0) { m.wanderDir = Math.random() * Math.PI * 2; m.wanderT = 1.5 + Math.random() * 2; }
+        moveX = Math.cos(m.wanderDir); moveZ = Math.sin(m.wanderDir);
+        break;
+      }
     }
+
+    // 应用移动
+    p.x += moveX * spd * dt;
+    p.z += moveZ * spd * dt;
     p.x = Math.max(1.3, Math.min(W - 1.3, p.x));
     p.z = Math.max(1.3, Math.min(D - 1.3, p.z));
     p.y = surfaceY(p.x, p.z);
-    m.g.rotation.y = Math.atan2(dx, dz);
-    const sw = dist > 1.15 ? Math.sin(m.t * 9) * 0.55 : 0;
+    // 面向：attack/chase 面向玩家，其余面向移动方向
+    if (m.state === "attack" || m.state === "chase") m.g.rotation.y = Math.atan2(dx, dz);
+    else if (Math.abs(moveX) + Math.abs(moveZ) > 0.1) m.g.rotation.y = Math.atan2(moveX, moveZ);
+    // 腿部动画
+    const moving = Math.abs(moveX) + Math.abs(moveZ) > 0.1;
+    const sw = moving ? Math.sin(m.t * 9) * 0.55 : 0;
     m.legs.forEach((L, li) => L.rotation.x = (li % 2 ? -sw : sw));
+    // 怪物间排斥（保留原逻辑）
     for (let j = i - 1; j >= 0; j--) {
       const o = mobs[j].g.position;
-      const sx = p.x - o.x, sz = p.z - o.z;
-      const sd = Math.hypot(sx, sz);
+      const sx = p.x - o.x, sz = p.z - o.z, sd = Math.hypot(sx, sz);
       if (sd < 0.8 && sd > 0.001) {
         const push = (0.8 - sd) * 0.5;
         p.x += (sx / sd) * push; p.z += (sz / sd) * push;
         o.x -= (sx / sd) * push; o.z -= (sz / sd) * push;
       }
     }
+
+    // ===== 攻击执行 =====
     if (m.type === "creeper") {
       if (m.fuse > 0) {
         m.fuse -= dt;
@@ -988,13 +1137,13 @@ function updateMobs(dt) {
           explode(p.x, p.y + 1, p.z, 3.2, 45);
           continue;
         }
-      } else if (dist < 2.3) {
+      } else if (m.state === "attack" && dist < 2.3) {
         m.fuse = 1.2;
         sfx.hiss();
       }
     } else {
       m.atkCd -= dt;
-      if (dist < 1.35 && m.atkCd <= 0) {
+      if (m.state === "attack" && dist < 1.35 && m.atkCd <= 0) {
         m.atkCd = 1;
         damagePlayer(8);
       }
@@ -1103,6 +1252,7 @@ let selSlot = 0, zoomed = false;
 let bobPhase = 0;
 let dayT = 0.12, curNightF = 0, nightAnnounced = false;
 const pos = new THREE.Vector3(W / 2 + 0.5, 8, D / 2 + 0.5);
+let lastPX = pos.x, lastPZ = pos.z; // 上帧玩家位置，用于估算速度做预判
 const vel = new THREE.Vector3();
 let yaw = 0, pitch = 0, onGround = false;
 const keys = {};
