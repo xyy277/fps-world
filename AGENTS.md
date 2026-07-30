@@ -28,8 +28,9 @@
 
 ```
 fps-world/
-├── minecraft-fps.html   # 游戏本体（单文件，约 2274 行）
-├── README.md            # 面向 GitHub 访客的推广文档
+├── minecraft-fps.html   # 游戏本体（单文件，约 2600 行）
+├── README.md            # 英文主文档（GitHub 国际化推广）
+├── README.zh-CN.md      # 中文文档
 ├── AGENTS.md            # 本文件，多 Agent 开发规则
 ├── docs/                # 研究与进度文档
 │   ├── fps-capability-research.md   # 单页 FPS 功能上限调研报告

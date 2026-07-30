@@ -1,152 +1,230 @@
 <div align="center">
 
-# 🎮 方块枪战 · Block FPS
+# 🎮 Block FPS · 方块枪战
 
-**一个单文件、零安装、即开即玩的体素风第一人称射击游戏**
-支持 PC 键鼠 + 移动端触屏 · 基于 Three.js
+**A single-file, zero-install, instantly-playable voxel first-person shooter.**
+Supports PC keyboard/mouse + mobile touch · Built with Three.js
 
 [![Play on GitHub Pages](https://img.shields.io/badge/Play-GitHub%20Pages-181717?style=for-the-badge&logo=github)](https://xyy277.github.io/fps-world/minecraft-fps.html)
 [![Play on Cloudflare](https://img.shields.io/badge/Play-Cloudflare%20Pages-F38020?style=for-the-badge&logo=cloudflare)](https://fps-world.pages.dev/minecraft-fps.html)
 [![View on GitHub](https://img.shields.io/badge/View-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/xyy277/fps-world)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](#-开源协议)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](#-license)
 [![Single File](https://img.shields.io/badge/single%20file-HTML-22c55e?style=for-the-badge)](minecraft-fps.html)
+[![Lines of Code](https://img.shields.io/badge/lines-2600+-orange?style=for-the-badge)](minecraft-fps.html)
 
-**👆 点击上方按钮立即游玩，无需下载，无需安装**
+**👆 Click any badge above to play instantly — no download, no install, no login.**
+
+[简体中文](README.zh-CN.md) · **English**
 
 </div>
 
 ---
 
-## ✨ 游戏特色
+## 📸 Screenshots
 
-> 我的世界风格 × 第一人称射击 × 波次生存，融在**一个 HTML 文件**里。
+<div align="center">
 
-- 🌍 **程序化体素世界** —— 64×64×24 地形，含树木、岩石、掩体，开局即随机生成
-- 🔫 **三种武器** —— 步枪（连发）/ 霰弹枪（近战爆发）/ 狙击枪（高倍瞄准镜），鼠标滚轮或按键快速切换
-- 🧟 **波次生存** —— 丧尸与苦力怕轮番进攻，越往后越凶；清空一波回血 25
-- 💥 **TNT 连锁引爆** —— 放置 TNT 一枪引爆，连锁爆炸清场丧尸，爽感拉满
-- 🌗 **昼夜循环** —— 白天视野开阔，夜晚丧尸更狂暴，氛围与难度同步变化
-- 🎯 **爆头双倍伤害** —— 命中头部金色 hitmarker，伤害翻倍
-- ❤️ **掉落补给** —— 击杀敌人掉落红心（回血）与弹药，鼓励主动出击
-- 🧱 **方块建造/破坏** —— 像我的世界一样放置与击碎方块，构建掩体或工事
-- 🎨 **零资源依赖** —— 所有纹理用 Canvas 程序化生成，所有音效用 Web Audio 合成，无任何图片/音频文件
-- 📱 **移动端原生触屏** —— 固定方向键 + 疾跑开关 + 滑动视角 + 动作按钮组，手机也能畅玩
+![Block FPS Hero Banner](docs/screenshots/hero-banner.jpg)
 
-## 🎮 操作方式
+*Daytime voxel battlefield — trees, blocks, and approaching enemies*
 
-### PC 键鼠
+![Night Combat Scene](docs/screenshots/night-combat.jpg)
 
-| 按键 | 功能 | 按键 | 功能 |
-|------|------|------|------|
-| W A S D | 移动 | 鼠标 | 视角 |
-| 左键 | 射击（击碎方块 / 引爆 TNT） | 右键 | 放置方块 |
-| Q / 滚轮 | 切换武器 | F | 狙击瞄准镜 |
-| 1 - 6 | 选择方块（6 = TNT） | R | 装填弹药 |
-| Shift | 疾跑 | 空格 | 跳跃 |
-| ESC | 暂停 | | |
+*Night combat — rain, torchlight, sniper scope, damage numbers*
 
-### 移动端触屏
+</div>
 
-| 操作 | 功能 |
-|------|------|
-| ▲ ◀ ▼ ▶ | 左侧方向键移动（支持多指斜向） |
-| 跑 | 点按切换疾跑 |
-| 屏幕空白处滑动 | 转动视角 |
-| 开火 / 跳 | 射击（按住连发）/ 跳跃 |
-| 放 / 弹 / 枪 / 镜 | 放方块 / 装填 / 切武器 / 狙击镜 |
-| 底部热键栏 | 点按选择方块（6 = TNT） |
-| ⏸ | 左上角暂停 |
+---
 
-> 💡 提示：苦力怕靠近会自爆，优先点杀！TNT 连锁引爆是清场利器。
+## 📑 Table of Contents
 
-## 🚀 立即游玩
+- [✨ Features](#-features)
+- [🎮 Controls](#-controls)
+- [🚀 Play Now](#-play-now)
+- [💻 Run Locally](#-run-locally)
+- [🛠 Tech Stack](#-tech-stack)
+- [📂 Project Structure](#-project-structure)
+- [🤝 Contributing](#-contributing)
+- [🗺 Roadmap](#-roadmap)
+- [📜 License](#-license)
 
-任选一个链接，浏览器打开即可：
+---
 
-| 平台 | 链接 | 特点 |
-|------|------|------|
-| GitHub Pages | https://xyy277.github.io/fps-world/minecraft-fps.html | 与代码仓库同步，推送即更新 |
-| Cloudflare Pages | https://fps-world.pages.dev/minecraft-fps.html | 全球 CDN 加速，访问更快 |
+## ✨ Features
 
-## 💻 本地运行
+> Minecraft-style × First-person shooter × Wave survival, all in **one HTML file**.
 
-无需任何构建步骤，三种方式任选其一：
+### World & Rendering
+- 🌍 **Procedural voxel world** — 64×64×24 terrain with trees, rocks, and cover, regenerated every game
+- 🌗 **Day-night cycle** — Wide visibility by day, frenzied zombies by night; atmosphere and difficulty shift together
+- 🌧 **Dynamic weather** — Rain/snow particle system tied to day-night, randomly switches (clear/rain/snow)
+- 🎨 **Zero asset dependencies** — All textures procedurally generated via Canvas 2D, all audio synthesized via Web Audio (no image/audio files)
+- ✨ **Bloom post-processing** — ACES Filmic tone mapping on high quality for a cinematic look (toggleable)
+
+### Combat & Weapons
+- 🔫 **Three weapons** — Rifle (auto) / Shotgun (close burst) / Sniper (high-power scope), switch via mouse wheel or keys
+- 💥 **Recoil & dynamic bloom** — Spread grows with sustained fire, recovers on stop; reload animation with gun dip
+- 💣 **Grenades & TNT** — Throwable grenades with parabolic physics; place TNT and chain-detonate for crowd clear
+- 🗡 **Melee attack** — Fan-shaped hit detection with cooldown for close-quarters
+- 🎯 **Headshot = 2× damage** — Golden hitmarker on head hits, double damage
+- ❤️ **Drop system** — Enemies drop hearts (heal) and ammo, rewarding aggression
+
+### Enemies & AI
+- 🧟 **Wave survival** — Zombies and Creepers attack in waves, escalating in fury; clearing a wave heals +25
+- 🧠 **FSM enemy AI** — State machine (chase/attack/flee/wander) with A* pathfinding (10×10 grid, 500-iter cap)
+- 🛡 **Cover & prediction** — Enemies use cover and predict player movement
+
+### Progression & Save (RPG-lite)
+- 💾 **Persistent save** — localStorage stores best score, best wave, total kills, total games, total headshots, best streak
+- 🏆 **12 achievements** — In-game real-time detection + toast notifications + achievement wall (First Kill → Legend)
+- 📈 **XP & leveling** — Kill +10xp, clear wave +20xp; level up grants skill points
+- ⬆ **Upgrade tree** — 4 attributes × 5 levels, all actually affect gameplay:
+  - Damage +10%/lvl (bullets & melee)
+  - Max HP +15/lvl (replaces hardcoded 100)
+  - Reload speed -10%/lvl
+  - Move speed +8%/lvl
+
+### Audio
+- 🎵 **Procedural BGM** — Three looping tracks (menu/battle/game-over) synthesized via Oscillator+GainNode, 8-bit chiptune aesthetic
+- 🔊 **Full SFX** — Gunfire, explosions, footsteps, reloads, hits, UI clicks, all synthesized
+- 🔇 **Default muted** — First visit is silent (avoids startling); toggle in settings, remembered across sessions
+
+### UI & Feedback
+- 🎯 **Dynamic crosshair** — Expands with bloom
+- 💬 **Damage numbers** — DOM-pooled, 3D→2D projected, float & fade; gold for headshots, red for crits
+- 📋 **Killfeed** — Last 5 kills, auto-fade
+- 🗺 **Minimap** — Canvas 2D, refreshed every 3 frames, shows player view cone/enemies/drops
+- 📊 **Stats board** — End-game table with weapon distribution, headshots, best streak
+- ⚙ **Settings panel** — Quality / volume / sensitivity + 5 toggles (mute/BGM/weather/textures/bloom), all remembered
+
+### Controls & Platforms
+- 🖥 **PC keyboard & mouse** — Full key mapping + pointer lock + mouse wheel weapon switch
+- 📱 **Mobile native touch** — Fixed D-pad + sprint toggle + swipe look + action buttons (fire/jump/place/reload/weapon/scope/grenade/melee)
+- 🎮 **First-time tutorial** — Operation hints shown on first game start (6s fade), with separate PC/touch versions
+
+## 🎮 Controls
+
+### PC (Keyboard & Mouse)
+
+| Key | Action | Key | Action |
+|-----|--------|-----|--------|
+| W A S D | Move | Mouse | Look |
+| Left Click | Shoot (break block / detonate TNT) | Right Click | Place block |
+| Q / Wheel | Switch weapon | F | Sniper scope |
+| 1 - 6 | Select block (6 = TNT) | R | Reload |
+| Shift | Sprint | Space | Jump |
+| G | Grenade | V | Melee |
+| ESC | Pause | | |
+
+### Mobile (Touch)
+
+| Control | Action |
+|---------|--------|
+| ▲ ◀ ▼ ▶ | Left D-pad (multi-touch diagonal supported) |
+| 跑 (Run) | Toggle sprint |
+| Swipe blank screen | Turn view |
+| 开火 / 跳 (Fire / Jump) | Shoot (hold for auto) / Jump |
+| 放 / 弹 / 枪 / 镜 / 雷 / 刀 | Place / Reload / Switch / Scope / Grenade / Melee |
+| Bottom hotbar | Select block (6 = TNT) |
+| ⏸ | Pause (top-left) |
+
+> 💡 Tip: Creepers self-destruct when close — prioritize them! TNT chain detonation is a crowd-clearing ace.
+
+## 🚀 Play Now
+
+Open either link in any modern browser:
+
+| Platform | URL | Notes |
+|----------|-----|-------|
+| GitHub Pages | https://xyy277.github.io/fps-world/minecraft-fps.html | Synced with repo, updates on push |
+| Cloudflare Pages | https://fps-world.pages.dev/minecraft-fps.html | Global CDN, faster access |
+
+## 💻 Run Locally
+
+No build step required — three options:
 
 ```bash
-# 方式一：直接双击文件
-直接用浏览器打开 minecraft-fps.html
+# Option 1: Double-click the file
+Just open minecraft-fps.html in your browser
 
-# 方式二：本地静态服务器（推荐，避免某些浏览器限制）
+# Option 2: Local static server (recommended, avoids browser restrictions)
 npx serve .
-# 或
+# or
 python -m http.server 8000
 ```
 
-## 🛠 技术栈
+## 🛠 Tech Stack
 
-| 层 | 技术 | 说明 |
-|----|------|------|
-| 渲染引擎 | [Three.js r128](https://threejs.org/) | 通过 CDN 引入，不打包 |
-| 实现语言 | 原生 HTML / CSS / JavaScript | 无框架、无编译、无依赖 |
-| 纹理 | Canvas 2D API | 程序化生成像素纹理 |
-| 音频 | Web Audio API | 程序化合成音效 |
-| 部署 | GitHub Pages + Cloudflare Pages | 纯静态托管 |
+| Layer | Tech | Notes |
+|-------|------|-------|
+| Rendering | [Three.js r128](https://threejs.org/) | Loaded via CDN, no bundler |
+| Language | Vanilla HTML / CSS / JavaScript | No framework, no compile step |
+| Textures | Canvas 2D API | Procedurally generated pixel textures |
+| Audio | Web Audio API | Procedurally synthesized SFX + BGM |
+| Save | localStorage | Versioned JSON, persistent progression |
+| Deployment | GitHub Pages + Cloudflare Pages | Static hosting, dual-deploy via GitHub Actions |
 
-**为什么单文件？** —— 极致的「即开即玩」体验：一个链接发给朋友就能玩，无需安装、无需登录、无需后端。整个游戏（含逻辑、渲染、纹理、音效）压缩在**一个 HTML 文件**里，约 1450 行代码。
+**Why single-file?** — The ultimate "instant play" experience: send a link to a friend and they're playing. No install, no login, no backend. The entire game (logic + rendering + textures + audio + progression) lives in **one HTML file**, ~2600 lines.
 
-## 📂 项目结构
+## 📂 Project Structure
 
 ```
 fps-world/
-├── minecraft-fps.html   # 游戏本体（单文件）
-├── README.md            # 本文档
-├── AGENTS.md            # 多 Agent 协作开发规则
-├── .gitignore           # 忽略 .env 等敏感文件
-└── .env.example         # 密钥字段占位模板
+├── minecraft-fps.html   # Game body (single file, ~2600 lines)
+├── README.md            # This doc (English)
+├── README.zh-CN.md      # Chinese README
+├── AGENTS.md            # Multi-agent collaboration rules
+├── docs/                # Research & progress docs
+│   ├── fps-capability-research.md   # Single-page FPS capability research
+│   ├── implementation-progress.md   # Implementation progress & roadmap
+│   └── screenshots/                 # README showcase images
+├── .github/workflows/   # CI: Cloudflare Pages auto-deploy
+├── .gitignore           # Excludes .env and sensitive files
+└── .env.example         # Credential field placeholder template
 ```
 
-## 🤝 参与贡献
+## 🤝 Contributing
 
-欢迎贡献！无论是修复 bug、优化玩法、改进触屏体验，还是新增武器/敌人类型。
+Contributions welcome! Whether fixing bugs, refining gameplay, improving touch UX, or adding weapons/enemies.
 
-1. Fork 本仓库
-2. 创建分支：`git checkout -b feat/your-feature`
-3. 提交更改：`git commit -m "feat: 添加 XXX"`
-4. 推送分支：`git push origin feat/your-feature`
-5. 发起 Pull Request
+1. Fork this repo
+2. Create branch: `git checkout -b feat/your-feature`
+3. Commit: `git commit -m "feat: add XXX"`
+4. Push: `git push origin feat/your-feature`
+5. Open a Pull Request
 
-> 多 Agent / AI 协作开发请先阅读 [AGENTS.md](AGENTS.md)，了解角色分工与编码规范。
+> For multi-agent / AI collaboration, read [AGENTS.md](AGENTS.md) first to understand role division and coding conventions.
 
-## 🗺 路线图
+## 🗺 Roadmap
 
-**已完成（P0-P4）**
-- [x] 架构与性能护栏（画质分级 + 对象池）
-- [x] 武器手感（后坐力 + 动态散布 + 换弹动画 + 手雷 + 近战）
-- [x] 敌人 AI（FSM 状态机 + A* 寻路 + 掩体预判）
-- [x] 战斗 UI（伤害数字 + 小地图 + 击杀提示 + 计分板 + 设置）
-- [x] 存档与进度系统（localStorage + 12 成就 + 升级树）
+**Completed (P0-P5)**
+- [x] Architecture & performance guards (quality presets + object pooling)
+- [x] Weapon feel (recoil + dynamic bloom + reload anim + grenades + melee)
+- [x] Enemy AI (FSM + A* pathfinding + cover & prediction)
+- [x] Combat UI (damage numbers + minimap + killfeed + stats board + settings)
+- [x] Save & progression (localStorage + 12 achievements + upgrade tree)
+- [x] Immersion (procedural BGM + weather + bloom + tutorial + 5 toggles)
 
-**规划中（P5-P7）**
-- [ ] 沉浸感增强（天气系统 + BGM + 后处理 + 教程）
-- [ ] 更多武器（手枪、火箭筒）
-- [ ] 更多敌人类型（骷髅弓箭手、蜘蛛）
-- [ ] Boss 战
-- [ ] 主动技能（冲刺 / 护盾 / 时停）
-- [ ] 排行榜（本地存储）
-- [ ] PWA 离线游玩 + 多语言 + 手柄支持
-- [ ] 更多地形生物群系
+**Planned (P6-P7)**
+- [ ] More weapons (pistol, rocket launcher)
+- [ ] More enemy types (skeleton archer, spider)
+- [ ] Boss fights
+- [ ] Active skills (sprint / shield / time slow)
+- [ ] Local leaderboard
+- [ ] PWA offline + i18n + gamepad support
+- [ ] More terrain biomes
 
-> 详细调研与进度见 [docs/](docs/)。
+> See [docs/](docs/) for detailed research and progress.
 
-## 📜 开源协议
+## 📜 License
 
-MIT License —— 可自由使用、修改、分发。打出你的星星 ⭐ 就是最大的鼓励！
+MIT License — free to use, modify, distribute. Dropping a ⭐ Star is the best encouragement!
 
 ---
 
 <div align="center">
 
-**如果这个游戏让你玩得开心，给个 ⭐ Star 支持一下！**
+**If you enjoyed the game, give it a ⭐ Star!**
 
 Made with ❤️ and Three.js
 
