@@ -140,6 +140,11 @@
   #upgrade-panel .up-row button { background: #5a9437; color: #fff; border: none; padding: 4px 12px; cursor: pointer; font-family: inherit; }
   #upgrade-panel .up-row button:disabled { background: #444; cursor: not-allowed; }
   #upgrade-panel .pts { color: #ffd833; }
+  /* ===== P5.5: 教程引导层 ===== */
+  #tutorial { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); border: 2px solid #9fd66b; color: #fff; padding: 18px 26px; font-size: 15px; line-height: 1.9; z-index: 60; display: none; max-width: 90vw; text-align: center; pointer-events: none; }
+  #tutorial b { color: #ffd833; }
+  #tutorial .tut-title { color: #9fd66b; font-size: 18px; margin-bottom: 8px; font-weight: bold; }
+  body.touch-mode #tutorial { font-size: 13px; padding: 14px 20px; }
 </style>
 </head>
 <body>
@@ -169,6 +174,7 @@
   <div id="achv-toast"></div>
 </div>
 <div id="hurt"></div>
+<div id="tutorial"></div>
 
 <div id="touch-ui">
   <div class="tbtn dpad" id="btn-up">▲</div>
@@ -268,6 +274,12 @@
     <div class="row"><span>鼠标灵敏度</span>
       <input type="range" id="set-sens" min="20" max="200" value="100">
     </div>
+    <h3 style="margin:14px 0 6px;color:#9fd66b;font-size:14px;">开关</h3>
+    <div class="row"><span>🔇 静音（总）</span><input type="checkbox" id="set-mute"></div>
+    <div class="row"><span>🎵 背景音乐</span><input type="checkbox" id="set-bgm"></div>
+    <div class="row"><span>🌧 天气效果</span><input type="checkbox" id="set-weather"></div>
+    <div class="row"><span>🧱 程序化纹理</span><input type="checkbox" id="set-texture"></div>
+    <div class="row"><span>✨ 后处理泛光（高画质）</span><input type="checkbox" id="set-bloom"></div>
     <button class="mc-btn small" id="set-close" style="margin-top:16px;">关闭</button>
   </div>
 </div>
@@ -326,9 +338,9 @@ function applyTouchMode() {
 // ---------------- 画质分级（低/中/高，影响 pixelRatio/雾距/云数/粒子上限） ----------------
 // 移动端默认低画质，桌面端默认中画质；运行时可在设置面板切换并记忆
 const QUALITY_PRESETS = {
-  low:  { pixelRatio: 1,   fogNear: 20, fogFar: 60, clouds: 4,  partMax: 120, antialias: false },
-  mid:  { pixelRatio: 1.5, fogNear: 28, fogFar: 84, clouds: 8,  partMax: 240, antialias: true  },
-  high: { pixelRatio: 2,   fogNear: 32, fogFar: 96, clouds: 10, partMax: 400, antialias: true  },
+  low:  { pixelRatio: 1,   fogNear: 20, fogFar: 60, clouds: 4,  partMax: 120, antialias: false, weather: 0   },
+  mid:  { pixelRatio: 1.5, fogNear: 28, fogFar: 84, clouds: 8,  partMax: 240, antialias: true,  weather: 300 },
+  high: { pixelRatio: 2,   fogNear: 32, fogFar: 96, clouds: 10, partMax: 400, antialias: true,  weather: 700 },
 };
 let qualityKey = "mid";
 {
@@ -469,6 +481,10 @@ const renderer = new THREE.WebGLRenderer({ antialias: Q.antialias });
 renderer.setPixelRatio(Q.pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
+// P5.4：后处理泛光近似——用 r128 内置 toneMapping 实现电影感色调映射，
+// 避免引入 EffectComposer 额外 CDN 依赖。开启时高光更柔和、画面更通透。
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
 
 const hemi = new THREE.HemisphereLight(0xffffff, 0x557744, 0.95);
 scene.add(hemi);
@@ -642,6 +658,8 @@ function applyQuality(key) {
   // 云数量增减
   while (clouds.length > Q.clouds) { const c = clouds.pop(); scene.remove(c); c.geometry.dispose(); }
   while (clouds.length < Q.clouds) makeCloud();
+  // P5.3：天气粒子数随画质重建
+  initWeather();
 }
 
 // ---------------- 音效 ----------------
@@ -706,6 +724,100 @@ const sfx = {
   boom()    { noiseHit(0.55, 0.5); tone(70, 22, 0.55, "sawtooth", 0.3); },
   pickup()  { tone(600, 900, 0.12, "triangle", 0.12); },
 };
+
+// ---------------- P5.1: BGM 程序化背景音乐 ----------------
+// 三段循环旋律：menu(舒缓) / battle(战斗) / over(结算)
+// 用 Oscillator + GainNode 序列播放，受 masterGain + bgmGain 双重控制
+// 音名→频率：C4=261.63，每升半音 ×2^(1/12)；这里用「音名+八度」字符串
+const NOTE_FREQ = {};
+(() => {
+  const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  for (let oct = 2; oct <= 6; oct++) {
+    for (let i = 0; i < 12; i++) {
+      // A4 = 440Hz，故 C4 = 440 × 2^(-9/12) ≈ 261.63
+      NOTE_FREQ[NAMES[i] + oct] = 440 * Math.pow(2, (i - 9) / 12 + (oct - 4));
+    }
+  }
+})();
+// 旋律定义：notes = [{ n: "E4", d: 0.5 }, { n: "C4", d: 0.5 }, ...]；d 为拍数
+// null 表示休止；bpm 决定每拍秒数
+const BGM_TRACKS = {
+  menu: { bpm: 80, wave: "triangle", vol: 0.10, notes: [
+    { n: "E4", d: 0.5 }, { n: "G4", d: 0.5 }, { n: "C5", d: 1 }, { n: "B4", d: 0.5 }, { n: "A4", d: 0.5 },
+    { n: "G4", d: 1 }, { n: "E4", d: 0.5 }, { n: "D4", d: 0.5 }, { n: "C4", d: 1.5 },
+    { n: "D4", d: 0.5 }, { n: "E4", d: 0.5 }, { n: "G4", d: 1 }, { n: "A4", d: 0.5 }, { n: "G4", d: 0.5 },
+    { n: "E4", d: 1.5 }, { n: null, d: 0.5 },
+  ]},
+  battle: { bpm: 140, wave: "square", vol: 0.08, notes: [
+    { n: "A3", d: 0.25 }, { n: "A3", d: 0.25 }, { n: "E4", d: 0.25 }, { n: "A4", d: 0.25 },
+    { n: "G4", d: 0.25 }, { n: "E4", d: 0.25 }, { n: "D4", d: 0.25 }, { n: "C4", d: 0.25 },
+    { n: "D4", d: 0.25 }, { n: "E4", d: 0.25 }, { n: "F4", d: 0.25 }, { n: "G4", d: 0.25 },
+    { n: "A4", d: 0.5 }, { n: "E4", d: 0.5 }, { n: "A3", d: 0.5 }, { n: null, d: 0.5 },
+  ]},
+  over: { bpm: 60, wave: "sine", vol: 0.12, notes: [
+    { n: "C4", d: 1 }, { n: "A3", d: 1 }, { n: "F3", d: 1 }, { n: "E3", d: 1.5 },
+    { n: "D3", d: 1 }, { n: "C3", d: 2 }, { n: null, d: 1 },
+  ]},
+};
+let bgmGain = null;     // BGM 独立增益（受 masterGain 再下一级）
+let bgmState = "menu";  // 当前播放的曲目：menu / battle / over
+let bgmTimer = null;    // setTimeout 句柄
+let bgmIdx = 0;         // 当前音符索引
+let bgmEnabled = true;  // 开关（P5.2 接入设置面板，默认开但受总静音控制）
+function initBgm() {
+  if (bgmGain) return;
+  bgmGain = AC.createGain();
+  bgmGain.gain.value = 0;
+  bgmGain.connect(masterGain);
+}
+// 播放单个音符：创建临时 osc + gain，包络起落避免爆音
+function playBgmNote(freq, dur, wave, vol) {
+  if (!AC || !bgmGain) return;
+  const osc = AC.createOscillator();
+  const g = AC.createGain();
+  osc.type = wave;
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0, AC.currentTime);
+  g.gain.linearRampToValueAtTime(vol, AC.currentTime + 0.02);  // 起音
+  g.gain.linearRampToValueAtTime(vol * 0.7, AC.currentTime + dur * 0.7);
+  g.gain.linearRampToValueAtTime(0, AC.currentTime + dur);     // 收尾
+  osc.connect(g); g.connect(bgmGain);
+  osc.start();
+  osc.stop(AC.currentTime + dur + 0.05);
+}
+// 循环播放指定曲目
+function tickBgm() {
+  const tr = BGM_TRACKS[bgmState];
+  if (!tr) return;
+  const note = tr.notes[bgmIdx];
+  const beat = 60 / tr.bpm;
+  if (note.n) {
+    playBgmNote(NOTE_FREQ[note.n], note.d * beat * 0.95, tr.wave, tr.vol);
+  }
+  bgmIdx = (bgmIdx + 1) % tr.notes.length;
+  bgmTimer = setTimeout(tickBgm, note.d * beat * 1000);
+}
+function setBgmState(s) {
+  if (!BGM_TRACKS[s]) return;
+  if (bgmState === s && bgmTimer) return;
+  bgmState = s;
+  bgmIdx = 0;
+  if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+  if (bgmEnabled && AC && masterGain) {
+    initBgm();
+    bgmGain.gain.linearRampToValueAtTime(1, AC.currentTime + 0.5);
+    tickBgm();
+  }
+}
+function stopBgm() {
+  if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+  if (bgmGain && AC) bgmGain.gain.linearRampToValueAtTime(0, AC.currentTime + 0.3);
+}
+function setBgmEnabled(on) {
+  bgmEnabled = on;
+  if (on) setBgmState(bgmState);
+  else stopBgm();
+}
 
 // ---------------- 枪械视图模型 ----------------
 const gun = new THREE.Group();
@@ -1685,6 +1797,7 @@ function gameOver() {
   clearTouchInput();
   if (document.pointerLockElement) document.exitPointerLock();
   finalizeGameStats(); // Phase 4.1：局末结算，写入存档/经验/成就
+  setBgmState("over"); // P5.1：切换结算 BGM
   $("final-stats").innerHTML =
     "最终得分 <b>" + score + "</b><br>坚持到第 <b>" + wave + "</b> 波<br>击杀怪物 <b>" + kills + "</b>";
   // 计分板：填充武器分布与统计
@@ -2000,6 +2113,80 @@ function updateDayNight(dt) {
   }
 }
 
+// ---------------- P5.3: 天气系统（雨/雪，与昼夜联动，可开关） ----------------
+// 用 THREE.Points 实现，粒子围绕玩家生成，跟随玩家移动
+// 天气类型：clear(晴) / rain(雨) / snow(雪)；定时随机切换，夜晚偏 rain
+const WEATHER = { type: "clear", points: null, positions: null, velocities: null, count: 0, switchT: 30 };
+function initWeather() {
+  if (WEATHER.points) { scene.remove(WEATHER.points); WEATHER.points.geometry.dispose(); WEATHER.points.material.dispose(); }
+  const n = Q.weather;
+  if (n === 0) { WEATHER.count = 0; WEATHER.points = null; return; }
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3);
+  const vel = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    pos[i * 3]     = (Math.random() - 0.5) * 36;       // 相对玩家 X
+    pos[i * 3 + 1] = Math.random() * 22;               // 高度 0-22
+    pos[i * 3 + 2] = (Math.random() - 0.5) * 36;       // 相对玩家 Z
+    vel[i] = 0.3 + Math.random() * 0.5;
+  }
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xaaccff, size: 0.18, transparent: true, opacity: 0.75,
+    depthWrite: false, sizeAttenuation: true,
+  });
+  WEATHER.points = new THREE.Points(geo, mat);
+  WEATHER.points.visible = false;
+  WEATHER.points.frustumCulled = false; // 跟随玩家，不裁剪
+  WEATHER.positions = pos;
+  WEATHER.velocities = vel;
+  WEATHER.count = n;
+  scene.add(WEATHER.points);
+}
+function setWeather(type) {
+  WEATHER.type = type;
+  if (!WEATHER.points) return;
+  WEATHER.points.visible = opt.weather && type !== "clear";
+  if (type === "rain") WEATHER.points.material.color.setHex(0xaaccff);
+  else if (type === "snow") WEATHER.points.material.color.setHex(0xffffff);
+}
+function pickRandomWeather() {
+  // 夜晚偏 rain，白天偏 clear/snow；黄昏过渡
+  const f = curNightF;
+  const r = Math.random();
+  if (f > 0.7) setWeather(r < 0.6 ? "rain" : (r < 0.85 ? "clear" : "snow"));
+  else if (f < 0.3) setWeather(r < 0.6 ? "clear" : (r < 0.85 ? "rain" : "snow"));
+  else setWeather(r < 0.5 ? "clear" : (r < 0.8 ? "rain" : "snow"));
+}
+function updateWeather(dt) {
+  if (!WEATHER.points || !opt.weather || WEATHER.type === "clear" || state !== "playing") return;
+  // 粒子云跟随玩家水平位置
+  WEATHER.points.position.set(pos.x, 0, pos.z);
+  const p = WEATHER.positions, v = WEATHER.velocities, n = WEATHER.count;
+  const fall = WEATHER.type === "snow" ? 1.5 : 7.0; // 雪慢，雨快
+  for (let i = 0; i < n; i++) {
+    const yi = i * 3 + 1;
+    p[yi] -= v[i] * fall * dt;
+    if (WEATHER.type === "snow") {
+      p[i * 3] += Math.sin((p[yi] + i) * 0.15) * 0.025; // 雪花水平飘
+    }
+    if (p[yi] < 0) {
+      p[i * 3]     = (Math.random() - 0.5) * 36;
+      p[yi]        = 22;
+      p[i * 3 + 2] = (Math.random() - 0.5) * 36;
+    }
+  }
+  WEATHER.points.geometry.attributes.position.needsUpdate = true;
+  // 定时切换天气
+  WEATHER.switchT -= dt;
+  if (WEATHER.switchT <= 0) { WEATHER.switchT = 30 + Math.random() * 30; pickRandomWeather(); }
+}
+// 替换 P5.2 的 stub：开关切换时立即生效
+function applyWeatherEnabled() {
+  if (WEATHER.points) WEATHER.points.visible = opt.weather && WEATHER.type !== "clear";
+}
+initWeather();
+
 // ---------------- 键鼠输入 ----------------
 const canvas = renderer.domElement;
 document.addEventListener("keydown", e => {
@@ -2186,10 +2373,46 @@ function startGame() {
   pauseEl.style.display = "none";
   hudEl.style.display = "block";
   state = "playing";
+  setBgmState("battle"); // P5.1：切换战斗 BGM
+  showTutorial();        // P5.5：首次进入显示操作指引
   if (!touchMode) canvas.requestPointerLock();
+}
+// P5.5：教程引导——首次开始游戏时显示操作提示，6 秒后淡出，localStorage 记忆
+let tutShown = false;
+function showTutorial() {
+  if (tutShown) return;
+  let seen = false; try { seen = localStorage.getItem("fk_tut") === "1"; } catch (e) {}
+  if (seen) return;
+  tutShown = true;
+  try { localStorage.setItem("fk_tut", "1"); } catch (e) {}
+  const el = $("tutorial");
+  el.innerHTML = touchMode
+    ? "<div class='tut-title'>🎮 操作指引</div>" +
+      "<b>方向键</b> 移动 · <b>跑</b> 疾跑<br>" +
+      "<b>开火</b> 射击 · <b>弹</b> 换弹 · <b>枪</b> 切武器<br>" +
+      "<b>雷</b> 手雷 · <b>刀</b> 近战 · <b>镜</b> 狙击镜<br>" +
+      "滑动屏幕空白处转动视角"
+    : "<div class='tut-title'>🎮 操作指引</div>" +
+      "<b>WASD</b> 移动 · <b>Shift</b> 疾跑 · <b>空格</b> 跳跃<br>" +
+      "<b>鼠标</b> 视角 · <b>左键</b> 射击 · <b>右键</b> 放方块<br>" +
+      "<b>R</b> 换弹 · <b>Q</b> 切武器 · <b>F</b> 狙击镜<br>" +
+      "<b>G</b> 手雷 · <b>V</b> 近战 · <b>1-6</b> 选方块";
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 6000);
 }
 $("startBtn").addEventListener("click", startGame);
 $("retryBtn").addEventListener("click", startGame);
+// P5.1：浏览器策略要求用户首次交互后才能播放音频；
+// 首次 click 时初始化 AC 并启动菜单 BGM（若仍在菜单且 BGM 开启）
+let bgmBootstrapped = false;
+function bootstrapAudio() {
+  if (bgmBootstrapped) return;
+  bgmBootstrapped = true;
+  ac();
+  if (state === "menu" && bgmEnabled) setBgmState("menu");
+}
+addEventListener("pointerdown", bootstrapAudio, { once: true });
+addEventListener("keydown", bootstrapAudio, { once: true });
 $("resumeBtn").addEventListener("click", () => {
   if (touchMode) {
     state = "playing";
@@ -2217,21 +2440,57 @@ $("qualityBtn").addEventListener("click", () => {
   applyQuality(QUALITY_ORDER[(idx + 1) % QUALITY_ORDER.length]);
   updateQualityBtn();
 });
-// 设置面板：开关 + 画质/音量/灵敏度绑定
+// 设置面板：开关 + 画质/音量/灵敏度绑定（P5.2 扩展）
 const settingsPanel = $("settings-panel");
 const setQualitySel = $("set-quality");
 const setVolumeIn = $("set-volume");
 const setSensIn = $("set-sens");
+const setMuteChk = $("set-mute");
+const setBgmChk = $("set-bgm");
+const setWeatherChk = $("set-weather");
+const setTextureChk = $("set-texture");
+const setBloomChk = $("set-bloom");
 let mouseSens = 1.0; // 灵敏度倍率，影响 pointermove
+// P5.2：开关状态统一管理，localStorage 记忆；首次进入默认静音
+const opt = {
+  muted: true,        // 总静音（首次默认静音，避免突然出声吓到用户）
+  bgm: true,          // BGM 开关
+  weather: true,      // 天气效果
+  texture: true,      // 程序化纹理
+  bloom: true,        // 后处理泛光
+};
+function loadOpt() {
+  const keys = ["muted", "bgm", "weather", "texture", "bloom"];
+  for (const k of keys) {
+    let v = null; try { v = localStorage.getItem("fk_opt_" + k); } catch (e) {}
+    if (v === "0") opt[k] = false;
+    else if (v === "1") opt[k] = true;
+  }
+}
+function saveOpt(k) { try { localStorage.setItem("fk_opt_" + k, opt[k] ? "1" : "0"); } catch (e) {} }
+loadOpt();
 {
   let s = null; try { s = localStorage.getItem("fk_sens"); } catch (e) {}
   if (s) { mouseSens = parseFloat(s) / 100; setSensIn.value = s; }
+  // P5.2：首次（无 fk_vol）默认音量 0；有记录则恢复
   let v = null; try { v = localStorage.getItem("fk_vol"); } catch (e) {}
-  if (v) setVolumeIn.value = v;
+  if (v) setVolumeIn.value = v; else setVolumeIn.value = opt.muted ? "0" : "70";
 }
 setQualitySel.value = qualityKey;
+// 同步开关状态到 UI
+function syncOptUI() {
+  setMuteChk.checked = opt.muted;
+  setBgmChk.checked = opt.bgm;
+  setWeatherChk.checked = opt.weather;
+  setTextureChk.checked = opt.texture;
+  setBloomChk.checked = opt.bloom;
+  // 静音时音量滑块禁用并置灰
+  setVolumeIn.disabled = opt.muted;
+  setVolumeIn.style.opacity = opt.muted ? 0.4 : 1;
+}
 function openSettings() {
   setQualitySel.value = qualityKey;
+  syncOptUI();
   settingsPanel.style.display = "flex";
   if (document.pointerLockElement) document.exitPointerLock();
 }
@@ -2245,10 +2504,40 @@ setSensIn.addEventListener("input", () => {
   mouseSens = parseFloat(setSensIn.value) / 100;
   try { localStorage.setItem("fk_sens", setSensIn.value); } catch (e) {}
 });
+// P5.2：开关绑定
+setMuteChk.addEventListener("change", () => { opt.muted = setMuteChk.checked; saveOpt("muted"); syncOptUI(); applyVolume(); if (!opt.muted) ac(); });
+setBgmChk.addEventListener("change", () => { opt.bgm = setBgmChk.checked; saveOpt("bgm"); setBgmEnabled(opt.bgm); });
+setWeatherChk.addEventListener("change", () => { opt.weather = setWeatherChk.checked; saveOpt("weather"); applyWeatherEnabled(); });
+setTextureChk.addEventListener("change", () => { opt.texture = setTextureChk.checked; saveOpt("texture"); applyTextureEnabled(); });
+setBloomChk.addEventListener("change", () => { opt.bloom = setBloomChk.checked; saveOpt("bloom"); applyBloomEnabled(); });
+// 首次初始化：同步 BGM 开关状态到 bgmEnabled
+bgmEnabled = opt.bgm;
 function applyVolume() {
-  const v = parseFloat(setVolumeIn.value) / 100;
-  if (window._masterGain) window._masterGain.gain.value = v;
+  if (!window._masterGain) return;
+  const v = opt.muted ? 0 : parseFloat(setVolumeIn.value) / 100;
+  window._masterGain.gain.value = v;
 }
+// P5.4：后处理泛光近似（用 toneMapping exposure 增强，仅高画质生效）
+function applyBloomEnabled() {
+  const enable = opt.bloom && qualityKey === "high";
+  renderer.toneMappingExposure = enable ? 1.2 : 1.0;
+}
+// P5.3：纹理开关——关闭时方块用纯色降级（降低纹理带宽，适配低端设备）
+function applyTextureEnabled() {
+  if (opt.texture) {
+    worldMat.map = atlasTex;
+    worldMat.color.setHex(0xffffff); // 白色让纹理原色显示
+  } else {
+    worldMat.map = null;
+    worldMat.color.setHex(0x7a8a5a); // 纯色 fallback（中性草地色）
+  }
+  worldMat.needsUpdate = true;
+}
+// applyWeatherEnabled 已在 P5.3 天气系统中定义
+// 首次应用一次（若 AC 已初始化）
+syncOptUI();
+applyBloomEnabled();
+applyTextureEnabled();
 
 // ---------------- Phase 4.2 / 4.3 / 4.4：进度面板 / 升级面板 ----------------
 const progressPanel = $("progress-panel");
@@ -2345,6 +2634,7 @@ function loop() {
     if (c.position.x > W + 8) c.position.x = -8;
   }
   updateDayNight(dt);
+  updateWeather(dt); // P5.3：天气粒子更新（内部判断开关与状态）
   if (boomLight.intensity > 0) boomLight.intensity = Math.max(0, boomLight.intensity - dt * 8);
   if (state === "playing") {
     updatePlayer(dt);
