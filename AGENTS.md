@@ -28,9 +28,13 @@
 
 ```
 fps-world/
-├── minecraft-fps.html   # 游戏本体（单文件，约 1450 行）
+├── minecraft-fps.html   # 游戏本体（单文件，约 2274 行）
 ├── README.md            # 面向 GitHub 访客的推广文档
 ├── AGENTS.md            # 本文件，多 Agent 开发规则
+├── docs/                # 研究与进度文档
+│   ├── fps-capability-research.md   # 单页 FPS 功能上限调研报告
+│   └── implementation-progress.md   # 实施进度与后续目标
+├── .github/workflows/   # CI：Cloudflare Pages 自动部署
 ├── .gitignore           # 忽略 .env 等敏感文件
 ├── .env                 # 本地密钥（被 .gitignore 排除，绝不提交）
 └── .env.example         # 密钥占位模板（可提交，供协作者参考字段）
