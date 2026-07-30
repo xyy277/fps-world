@@ -242,10 +242,11 @@ const BLOCK_COLORS = { 1:0x5fae3f, 2:0x8a5a2b, 3:0x8a8a8a, 4:0x6b4a22, 5:0x3d7a2
 const PLACEABLE = [1, 2, 3, 7, 8, 9];
 
 // ---------------- 武器定义 ----------------
+// bloom: 每发增加的散布；bloomMax: 连发散布上限；bloomRecover: 每秒恢复量
 const WEAPONS = {
-  rifle:   { name: "步枪",   dmg: 35,  head: 70,  rate: 0.13, mag: 30, reload: 1.15, spread: 0,    pellets: 1, kick: 0.13 },
-  shotgun: { name: "霰弹枪", dmg: 13,  head: 22,  rate: 0.75, mag: 6,  reload: 1.8,  spread: 0.06, pellets: 8, kick: 0.3  },
-  sniper:  { name: "狙击枪", dmg: 150, head: 300, rate: 1.15, mag: 5,  reload: 2.0,  spread: 0,    pellets: 1, kick: 0.26 },
+  rifle:   { name: "步枪",   dmg: 35,  head: 70,  rate: 0.13, mag: 30, reload: 1.15, spread: 0,    pellets: 1, kick: 0.13, bloom: 0.010, bloomMax: 0.05, bloomRecover: 0.18 },
+  shotgun: { name: "霰弹枪", dmg: 13,  head: 22,  rate: 0.75, mag: 6,  reload: 1.8,  spread: 0.06, pellets: 8, kick: 0.3,  bloom: 0.030, bloomMax: 0.10, bloomRecover: 0.25 },
+  sniper:  { name: "狙击枪", dmg: 150, head: 300, rate: 1.15, mag: 5,  reload: 2.0,  spread: 0,    pellets: 1, kick: 0.26, bloom: 0.025, bloomMax: 0.07, bloomRecover: 0.15 },
 };
 const WORDER = ["rifle", "shotgun", "sniper"];
 
@@ -706,6 +707,28 @@ function updateTracers(dt) {
     }
   }
 }
+// 弹壳抛出：从枪身右侧抛出黄铜色小方块，复用粒子池
+const SHELL_COLOR = 0xc0a040;
+function ejectShell() {
+  if (particles.length >= Q.partMax) return;
+  const o = camera.position;
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+  const m = partPool.length ? partPool.pop() : new THREE.Mesh(partGeo, getPartMat(SHELL_COLOR));
+  m.material = getPartMat(SHELL_COLOR);
+  m.position.set(o.x + right.x * 0.25 + fwd.x * 0.1, o.y - 0.12, o.z + right.z * 0.25 + fwd.z * 0.1);
+  m.scale.set(1, 1, 1);
+  m.visible = true;
+  scene.add(m);
+  particles.push({
+    m,
+    vx: right.x * 2.2 + (Math.random() - 0.5) * 0.6,
+    vy: 1.8 + Math.random() * 0.6,
+    vz: right.z * 2.2 + (Math.random() - 0.5) * 0.6,
+    life: 0.7 + Math.random() * 0.3,
+  });
+}
 
 // ---------------- 爆炸 ----------------
 const tntQueue = [];
@@ -996,6 +1019,7 @@ const mags = { rifle: 30, shotgun: 6, sniper: 5 };
 let wave = 0, waveState = "clear", spawnTimer = 2.5;
 let reloading = false, reloadT = 0;
 let shooting = false, fireCd = 0, gunKick = 0, flashT = 0, shakeT = 0;
+let bloom = 0; // 当前动态散布（连发增大，停火恢复）
 let selSlot = 0, zoomed = false;
 let bobPhase = 0;
 let dayT = 0.12, curNightF = 0, nightAnnounced = false;
@@ -1122,7 +1146,9 @@ function shoot() {
   flashT = 0.05;
   shakeT = Math.max(shakeT, 0.05 + w.kick * 0.4);
   pitch += w.kick * 0.09;
+  bloom = Math.min(w.bloomMax, bloom + w.bloom); // 连发增大散布
   sfx.shoot(cur);
+  ejectShell(); // 抛出弹壳
 
   const o = camera.position;
   const baseDir = new THREE.Vector3();
@@ -1131,10 +1157,11 @@ function shoot() {
 
   for (let p = 0; p < w.pellets; p++) {
     const dir = baseDir.clone();
-    if (w.spread > 0) {
-      dir.x += (Math.random() - 0.5) * w.spread * 2;
-      dir.y += (Math.random() - 0.5) * w.spread * 2;
-      dir.z += (Math.random() - 0.5) * w.spread * 2;
+    const sp = w.spread + bloom; // 基础散布 + 动态 bloom
+    if (sp > 0) {
+      dir.x += (Math.random() - 0.5) * sp * 2;
+      dir.y += (Math.random() - 0.5) * sp * 2;
+      dir.z += (Math.random() - 0.5) * sp * 2;
       dir.normalize();
     }
     let best = -1, bestT = Infinity;
@@ -1279,6 +1306,25 @@ function updatePlayer(dt) {
   gun.position.z = -0.55 + gunKick;
   gun.position.y = -0.3 + bobY * 0.5;
   gun.rotation.x = gunKick * 1.4;
+  gun.rotation.z = 0;
+
+  // 换弹动画：枪身下沉+旋转，sin 曲线 0→1→0
+  if (reloading) {
+    reloadT -= dt;
+    const w = WEAPONS[cur];
+    const p = 1 - reloadT / w.reload; // 进度 0→1
+    const dip = Math.sin(p * Math.PI); // 0→1→0
+    gun.position.y -= dip * 0.18;
+    gun.rotation.z = dip * 0.35;
+    if (reloadT <= 0) { reloading = false; mags[cur] = w.mag; updateHUD(); }
+  }
+
+  // bloom 衰减恢复（停火时更快恢复）
+  const w0 = WEAPONS[cur];
+  bloom = Math.max(0, bloom - dt * (shooting ? w0.bloomRecover * 0.4 : w0.bloomRecover));
+  // 准星随 bloom 动态扩大
+  const ch = $("crosshair");
+  if (ch) { const sz = 22 + bloom * 280; ch.style.width = sz + "px"; ch.style.height = sz + "px"; }
 
   flashT -= dt;
   muzzle.visible = flashT > 0;
@@ -1286,11 +1332,6 @@ function updatePlayer(dt) {
 
   fireCd -= dt;
   if (shooting && fireCd <= 0) shoot();
-
-  if (reloading) {
-    reloadT -= dt;
-    if (reloadT <= 0) { reloading = false; mags[cur] = WEAPONS[cur].mag; updateHUD(); }
-  }
 
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
@@ -1516,7 +1557,7 @@ function startGame() {
   mags.shotgun = WEAPONS.shotgun.mag;
   mags.sniper = WEAPONS.sniper.mag;
   wave = 0; waveState = "clear"; spawnTimer = 2.5;
-  reloading = false; shooting = false; fireCd = 0;
+  reloading = false; shooting = false; fireCd = 0; bloom = 0; gunKick = 0;
   if (zoomed) { zoomed = false; camera.fov = 75; camera.updateProjectionMatrix(); }
   updateGunModel();
   pos.set(W / 2 + 0.5, surfaceY(W / 2, D / 2) + 0.1, D / 2 + 0.5);
