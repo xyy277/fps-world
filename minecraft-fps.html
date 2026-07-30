@@ -116,6 +116,7 @@
   </div>
   <div id="weapon">步枪</div>
   <div id="ammo">30 <small>/ ∞</small></div>
+  <div id="grenade" style="position:absolute;right:16px;bottom:46px;color:#9fd66b;text-shadow:2px 2px 0 #000;font-size:14px;">💣 3</div>
   <div id="hotbar"></div>
   <div id="banner"></div>
 </div>
@@ -134,6 +135,8 @@
   <div class="tbtn" id="btn-reload">弹</div>
   <div class="tbtn" id="btn-weapon">枪</div>
   <div class="tbtn" id="btn-zoom">镜</div>
+  <div class="tbtn" id="btn-grenade" style="right:78px;bottom:264px;width:46px;height:46px;font-size:13px;">雷</div>
+  <div class="tbtn" id="btn-melee" style="right:136px;bottom:304px;width:46px;height:46px;font-size:13px;">刀</div>
 </div>
 
 <div id="menu" class="overlay">
@@ -156,6 +159,7 @@
       <tr><td class="k">屏幕空白处滑动</td><td>转动视角</td></tr>
       <tr><td class="k">开火 / 跳</td><td>射击（按住连发）/ 跳跃</td></tr>
       <tr><td class="k">放 / 弹 / 枪 / 镜</td><td>放方块 / 装填 / 切武器 / 狙击镜</td></tr>
+      <tr><td class="k">雷 / 刀</td><td>投手雷 / 近战挥刀</td></tr>
       <tr><td class="k">底部热键栏</td><td>点按选择方块（6 = TNT）</td></tr>
       <tr><td class="k">⏸</td><td>左上角暂停</td></tr>
     </table>
@@ -782,6 +786,81 @@ function updateTNT(dt) {
   }
 }
 
+// ---------------- 手雷（抛射武器，G 键投掷） ----------------
+// 抛物线物理 + 落地/定时引爆，复用 explode()
+const grenades = [];
+const grenadeGeo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+const grenadeMat = new THREE.MeshLambertMaterial({ color: 0x3a5a2a });
+let grenadeAmmo = 3; // 初始 3 颗，击杀掉落可补充
+function throwGrenade() {
+  if (state !== "playing" || grenadeAmmo <= 0) return;
+  grenadeAmmo--;
+  const o = camera.position;
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  const m = new THREE.Mesh(grenadeGeo, grenadeMat);
+  m.position.set(o.x + dir.x * 0.6, o.y + dir.y * 0.6 - 0.1, o.z + dir.z * 0.6);
+  scene.add(m);
+  grenades.push({
+    m,
+    vx: dir.x * 14, vy: dir.y * 14 + 3, vz: dir.z * 14, // 初速 + 上抛分量
+    fuse: 2.0, // 2 秒引信
+  });
+  sfx.switchW();
+  updateHUD();
+}
+function updateGrenades(dt) {
+  for (let i = grenades.length - 1; i >= 0; i--) {
+    const g = grenades[i];
+    g.vy -= 22 * dt; // 重力
+    g.m.position.x += g.vx * dt;
+    g.m.position.y += g.vy * dt;
+    g.m.position.z += g.vz * dt;
+    g.m.rotation.x += dt * 8; g.m.rotation.z += dt * 6;
+    g.fuse -= dt;
+    // 简易碰撞：落地方块则弹跳停顿
+    const px = Math.floor(g.m.position.x), py = Math.floor(g.m.position.y - 0.11), pz = Math.floor(g.m.position.z);
+    if (getBlock(px, py, pz) && g.vy < 0) {
+      g.m.position.y = py + 1.11;
+      g.vy *= -0.35; g.vx *= 0.6; g.vz *= 0.6;
+    }
+    // 引信到时引爆
+    if (g.fuse <= 0) {
+      const p = g.m.position;
+      scene.remove(g.m);
+      grenades.splice(i, 1);
+      explode(p.x, p.y, p.z, 3.8, 55);
+    }
+  }
+}
+
+// ---------------- 近战（V 键挥刀，扇形判定） ----------------
+let meleeCd = 0, meleeT = 0; // 冷却 / 动画计时
+function melee() {
+  if (state !== "playing" || meleeCd > 0) return;
+  meleeCd = 0.5; meleeT = 0.18; // 0.5s 冷却，0.18s 动画
+  sfx.switchW();
+  const o = camera.position;
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  // 扇形判定：距离 < 2.6 且夹角 < 50°
+  const cosA = Math.cos(50 * Math.PI / 180);
+  for (const m of mobs) {
+    const mp = m.g.position;
+    const dx = mp.x - o.x, dy = (mp.y + 1) - o.y, dz = mp.z - o.z;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist > 2.6 || dist < 0.01) continue;
+    const dot = (dx * fwd.x + dy * fwd.y + dz * fwd.z) / dist;
+    if (dot < cosA) continue;
+    m.hp -= 65;
+    m.flashT = 0.12;
+    m.g.position.x += fwd.x * 0.4;
+    m.g.position.z += fwd.z * 0.4;
+    spawnParticles(mp.x, mp.y + 1, mp.z, 0x8bc34a, 5, 2.5);
+  }
+  cleanupDead();
+}
+
 // ---------------- 怪物 ----------------
 const mobs = [];
 function buildZombieModel(g, mats, legs) {
@@ -1062,6 +1141,8 @@ function updateHUD() {
   $("weapon").textContent = WEAPONS[cur].name + (cur === "sniper" ? (touchMode ? "（镜 瞄准）" : "（F 瞄准）") : "");
   if (reloading) { ammoEl.textContent = "装填中…"; ammoEl.className = "reloading"; }
   else { ammoEl.innerHTML = mags[cur] + " <small>/ ∞</small>"; ammoEl.className = ""; }
+  const ge = $("grenade");
+  if (ge) ge.textContent = "💣 " + grenadeAmmo;
 }
 
 // 热键栏
@@ -1332,6 +1413,15 @@ function updatePlayer(dt) {
 
   fireCd -= dt;
   if (shooting && fireCd <= 0) shoot();
+  // 近战冷却与挥刀动画：枪身快速下挥再回位
+  if (meleeCd > 0) meleeCd -= dt;
+  if (meleeT > 0) {
+    meleeT -= dt;
+    const p = 1 - meleeT / 0.18; // 0→1
+    const sw = Math.sin(p * Math.PI);
+    gun.rotation.x = sw * 1.2; // 下挥
+    gun.position.z = -0.55 - sw * 0.15;
+  }
 
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
@@ -1405,6 +1495,8 @@ document.addEventListener("keydown", e => {
   if (e.code === "KeyR") startReload();
   if (e.code === "KeyQ") switchWeapon(1);
   if (e.code === "KeyF") toggleZoom();
+  if (e.code === "KeyG") throwGrenade();
+  if (e.code === "KeyV") melee();
   if (e.code.startsWith("Digit")) {
     const n = +e.code.slice(5);
     if (n >= 1 && n <= PLACEABLE.length) selectSlot(n - 1);
@@ -1520,6 +1612,8 @@ bindTap("btn-place",  () => placeBlock());
 bindTap("btn-reload", () => { if (state === "playing") startReload(); });
 bindTap("btn-weapon", () => { if (state === "playing") switchWeapon(1); });
 bindTap("btn-zoom",   () => toggleZoom());
+bindTap("btn-grenade", () => { if (state === "playing") throwGrenade(); });
+bindTap("btn-melee",   () => { if (state === "playing") melee(); });
 bindTap("btn-sprint", () => {
   dpad.sprint = !dpad.sprint;
   $("btn-sprint").classList.toggle("on", dpad.sprint);
@@ -1547,11 +1641,14 @@ function startGame() {
   tracers.length = 0;
   for (const d of drops) { scene.remove(d.m); d.m.geometry.dispose(); d.m.material.dispose(); }
   drops.length = 0;
+  for (const g of grenades) scene.remove(g.m);
+  grenades.length = 0;
   tntQueue.length = 0;
   clearTouchInput();
   lookId = null;
 
   health = 100; score = 0; kills = 0;
+  grenadeAmmo = 3; meleeCd = 0; meleeT = 0;
   cur = "rifle";
   mags.rifle = WEAPONS.rifle.mag;
   mags.shotgun = WEAPONS.shotgun.mag;
@@ -1632,6 +1729,7 @@ function loop() {
     updateParticles(dt);
     updateTracers(dt);
     updateTNT(dt);
+    updateGrenades(dt);
     updateDrops(dt);
   }
   renderer.render(scene, camera);
