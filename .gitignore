@@ -1,0 +1,44 @@
+# ===== 密钥与敏感文件（绝对不能提交） =====
+.env
+.env.*
+!.env.example
+.dev.vars
+*.local
+secrets.json
+credentials.json
+
+# ===== Cloudflare / Wrangler =====
+.wrangler/
+.dev.vars.*
+wrangler.toml.local
+
+# ===== Node =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== 构建产物 =====
+dist/
+build/
+out/
+*.log
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# ===== 临时文件 =====
+*.tmp
+*.bak
+*.cache
