@@ -96,11 +96,32 @@
   body.touch-mode #controls-pc { display: none; }
   body:not(.touch-mode) #controls-touch { display: none; }
   body.touch-mode .overlay h1 { font-size: 34px; }
+  /* ===== Phase 3: 伤害数字 / 击杀提示 / 小地图 / 计分板 / 设置面板 ===== */
+  .dmg-num { position: absolute; font: bold 18px monospace; color: #fff; text-shadow: 2px 2px 0 #000; pointer-events: none; will-change: transform,opacity; }
+  .dmg-num.head { color: #ffd833; font-size: 24px; }
+  .dmg-num.crit { color: #ff5555; }
+  #killfeed { position: absolute; top: 14px; right: 14px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
+  .kill-entry { background: rgba(0,0,0,0.55); color: #fff; padding: 4px 10px; font-size: 14px; border-left: 3px solid #8bc34a; transition: opacity .4s; }
+  .kill-entry.creeper { border-left-color: #4caf50; }
+  .kill-entry .wpn { color: #ffd833; }
+  #minimap { position: absolute; top: 14px; left: 14px; width: 140px; height: 140px; border: 2px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.45); image-rendering: pixelated; }
+  body.touch-mode #minimap { width: 100px; height: 100px; }
+  #stats-board { display: none; }
+  #stats-board table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  #stats-board td, #stats-board th { padding: 6px 10px; border-bottom: 1px solid #333; text-align: left; }
+  #stats-board b { color: #ffd833; }
+  #settings-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center; }
+  #settings-panel .panel { background: #2a2a2a; border: 2px solid #555; padding: 24px 32px; min-width: 320px; }
+  #settings-panel h2 { color: #fff; margin: 0 0 16px; }
+  #settings-panel .row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; color: #ddd; }
+  #settings-panel select, #settings-panel input { background: #1a1a1a; color: #fff; border: 1px solid #555; padding: 4px 8px; }
 </style>
 </head>
 <body>
 
 <div id="hud">
+  <canvas id="minimap" width="140" height="140"></canvas>
+  <div id="killfeed"></div>
   <div id="crosshair"></div>
   <div id="hitmarker"></div>
   <div id="stats">
@@ -166,6 +187,7 @@
   </div>
   <button class="mc-btn small" id="touchToggle">📱 触屏按键模式</button>
   <button class="mc-btn small" id="qualityBtn">🎨 画质：中</button>
+  <button class="mc-btn small" id="settingsBtn">⚙ 设置</button>
   <button class="mc-btn" id="startBtn">开始游戏</button>
   <div class="tip">
     ⚠ 苦力怕靠近你会自爆，优先点杀！· TNT 可连锁引爆，炸丧尸效率一流<br>
@@ -176,12 +198,45 @@
 <div id="pause" class="overlay">
   <h1>已暂停</h1>
   <button class="mc-btn" id="resumeBtn">继续游戏</button>
+  <button class="mc-btn small" id="pauseSettingsBtn">⚙ 设置</button>
 </div>
 
 <div id="gameover" class="overlay">
   <h1 style="text-shadow: 4px 4px 0 #6e1a1a;">游戏结束</h1>
   <div id="final-stats"></div>
+  <div id="stats-board">
+    <table>
+      <tr><th>击杀武器分布</th><th>次数</th></tr>
+      <tr><td>步枪</td><td><b id="sb-rifle">0</b></td></tr>
+      <tr><td>霰弹枪</td><td><b id="sb-shotgun">0</b></td></tr>
+      <tr><td>狙击枪</td><td><b id="sb-sniper">0</b></td></tr>
+      <tr><td>手雷</td><td><b id="sb-grenade">0</b></td></tr>
+      <tr><td>近战</td><td><b id="sb-melee">0</b></td></tr>
+      <tr><td>爆头数</td><td><b id="sb-head">0</b></td></tr>
+      <tr><td>最高连杀</td><td><b id="sb-streak">0</b></td></tr>
+    </table>
+  </div>
   <button class="mc-btn" id="retryBtn">重新开始</button>
+</div>
+
+<div id="settings-panel">
+  <div class="panel">
+    <h2>⚙ 设置</h2>
+    <div class="row"><span>画质</span>
+      <select id="set-quality">
+        <option value="low">低</option>
+        <option value="mid">中</option>
+        <option value="high">高</option>
+      </select>
+    </div>
+    <div class="row"><span>音效音量</span>
+      <input type="range" id="set-volume" min="0" max="100" value="70">
+    </div>
+    <div class="row"><span>鼠标灵敏度</span>
+      <input type="range" id="set-sens" min="20" max="200" value="100">
+    </div>
+    <button class="mc-btn small" id="set-close" style="margin-top:16px;">关闭</button>
+  </div>
 </div>
 
 <script>
@@ -530,9 +585,17 @@ function applyQuality(key) {
 }
 
 // ---------------- 音效 ----------------
-let AC = null;
+let AC = null, masterGain = null;
 function ac() {
-  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (!AC) {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = AC.createGain();
+    masterGain.gain.value = 0.7;
+    masterGain.connect(AC.destination);
+    window._masterGain = masterGain;
+    // 读取已保存的音量
+    try { const v = localStorage.getItem("fk_vol"); if (v) masterGain.gain.value = parseFloat(v) / 100; } catch (e) {}
+  }
   if (AC.state === "suspended") AC.resume();
   return AC;
 }
@@ -544,7 +607,7 @@ function tone(f0, f1, dur, type, vol) {
     if (f1) o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), a.currentTime + dur);
     g.gain.setValueAtTime(vol || 0.15, a.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
-    o.connect(g); g.connect(a.destination);
+    o.connect(g); g.connect(masterGain);
     o.start(); o.stop(a.currentTime + dur);
   } catch (e) {}
 }
@@ -558,7 +621,7 @@ function noiseHit(dur, vol) {
     s.buffer = buf;
     g.gain.setValueAtTime(vol, a.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
-    s.connect(g); g.connect(a.destination);
+    s.connect(g); g.connect(masterGain);
     s.start();
   } catch (e) {}
 }
@@ -854,6 +917,7 @@ function melee() {
     if (dot < cosA) continue;
     m.hp -= 65;
     m.flashT = 0.12;
+    m.lastHitBy = "melee";
     m.g.position.x += fwd.x * 0.4;
     m.g.position.z += fwd.z * 0.4;
     spawnParticles(mp.x, mp.y + 1, mp.z, 0x8bc34a, 5, 2.5);
@@ -1028,6 +1092,14 @@ function killMob(i) {
   sfx.kill();
   kills++;
   score += m.type === "creeper" ? 15 : 10;
+  // 击杀提示 + 统计（cause 由 m.lastHitBy 携带，默认当前武器）
+  const cause = m.lastHitBy || cur;
+  const wpnName = cause === "grenade" ? "手雷" : cause === "melee" ? "近战" : WEAPONS[cause] ? WEAPONS[cause].name : "武器";
+  addKillFeed(wpnName, m.type);
+  if (killStats[cause] !== undefined) killStats[cause]++;
+  if (m.lastHitHead) killStats.head++;
+  killStats.curStreak++;
+  if (killStats.curStreak > killStats.streak) killStats.streak = killStats.curStreak;
   const r = Math.random();
   if (m.type === "zombie" && r < 0.22) spawnDrop(p.x, surfaceY(p.x, p.z) + 0.35, p.z, "heart");
   else if (m.type === "creeper" && r < 0.3) spawnDrop(p.x, surfaceY(p.x, p.z) + 0.35, p.z, "ammo");
@@ -1282,6 +1354,104 @@ function showHitmarker(head) {
   clearTimeout(hitTimer);
   hitTimer = setTimeout(() => hitEl.style.opacity = 0, 90);
 }
+// ---------------- 战斗 UI：伤害数字 + 击杀提示 + 小地图 + 统计 ----------------
+// 伤害数字 DOM 池（避免每帧创建元素）
+const dmgNumPool = [];
+const activeDmgNums = [];
+function getDmgEl() {
+  if (dmgNumPool.length) return dmgNumPool.pop();
+  const el = document.createElement("div");
+  el.className = "dmg-num";
+  document.body.appendChild(el);
+  return el;
+}
+// 在屏幕坐标 (sx, sy) 生成浮动伤害数字
+function spawnDmgNum(sx, sy, dmg, kind) {
+  const el = getDmgEl();
+  el.className = "dmg-num" + (kind === "head" ? " head" : kind === "crit" ? " crit" : "");
+  el.textContent = dmg;
+  el.style.left = sx + "px";
+  el.style.top = sy + "px";
+  el.style.opacity = "1";
+  el.style.transform = "translate(-50%,-50%)";
+  el.style.display = "block";
+  activeDmgNums.push({ el, t: 0, ox: (Math.random() - 0.5) * 30, baseX: sx, baseY: sy });
+}
+function updateDmgNums(dt) {
+  for (let i = activeDmgNums.length - 1; i >= 0; i--) {
+    const d = activeDmgNums[i];
+    d.t += dt;
+    const p = d.t / 0.8; // 0.8s 寿命
+    if (p >= 1) {
+      d.el.style.display = "none";
+      dmgNumPool.push(d.el);
+      activeDmgNums.splice(i, 1);
+      continue;
+    }
+    d.el.style.left = (d.baseX + d.ox * p) + "px";
+    d.el.style.top = (d.baseY - 40 * p) + "px";
+    d.el.style.opacity = (1 - p).toFixed(2);
+  }
+}
+// 将 3D 世界坐标投影到屏幕坐标，用于伤害数字定位
+function project2D(vec3) {
+  const v = vec3.clone().project(camera);
+  return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight, visible: v.z < 1 };
+}
+// 击杀提示 killfeed
+const killfeedEl = $("killfeed");
+function addKillFeed(wpnName, mobType) {
+  const e = document.createElement("div");
+  e.className = "kill-entry" + (mobType === "creeper" ? " creeper" : "");
+  e.innerHTML = "你 <span class='wpn'>[" + wpnName + "]</span> " + (mobType === "creeper" ? "苦力怕" : "丧尸");
+  killfeedEl.appendChild(e);
+  setTimeout(() => { e.style.opacity = "0"; }, 3.5);
+  setTimeout(() => { e.remove(); }, 4.0);
+  // 限制最多 5 条
+  while (killfeedEl.children.length > 5) killfeedEl.removeChild(killfeedEl.firstChild);
+}
+// 击杀统计追踪
+const killStats = { rifle: 0, shotgun: 0, sniper: 0, grenade: 0, melee: 0, head: 0, streak: 0, curStreak: 0 };
+function resetKillStats() { for (const k in killStats) killStats[k] = 0; killStats.curStreak = 0; }
+// 小地图绘制
+const minimapCtx = $("minimap").getContext("2d");
+function drawMinimap() {
+  const ctx = minimapCtx;
+  const sz = 140, scale = sz / W;
+  ctx.clearRect(0, 0, sz, sz);
+  // 边框
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(0, 0, sz, sz);
+  // 玩家视野扇形
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.beginPath();
+  ctx.moveTo(pos.x * scale, pos.z * scale);
+  ctx.arc(pos.x * scale, pos.z * scale, 30, yaw - 0.6, yaw + 0.6);
+  ctx.closePath();
+  ctx.fill();
+  // 掉落（黄点）
+  ctx.fillStyle = "#ffd833";
+  for (const d of drops) {
+    ctx.fillRect(d.m.position.x * scale - 1, d.m.position.z * scale - 1, 2, 2);
+  }
+  // 怪物（红点）
+  ctx.fillStyle = "#ff4444";
+  for (const m of mobs) {
+    const p = m.g.position;
+    ctx.fillRect(p.x * scale - 1.5, p.z * scale - 1.5, 3, 3);
+  }
+  // 玩家（白三角朝向）
+  ctx.save();
+  ctx.translate(pos.x * scale, pos.z * scale);
+  ctx.rotate(yaw);
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.moveTo(0, -4); ctx.lineTo(-3, 3); ctx.lineTo(3, 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function updateHUD() {
   $("score").textContent = score;
   $("kills").textContent = kills;
@@ -1342,6 +1512,15 @@ function gameOver() {
   if (document.pointerLockElement) document.exitPointerLock();
   $("final-stats").innerHTML =
     "最终得分 <b>" + score + "</b><br>坚持到第 <b>" + wave + "</b> 波<br>击杀怪物 <b>" + kills + "</b>";
+  // 计分板：填充武器分布与统计
+  $("sb-rifle").textContent = killStats.rifle;
+  $("sb-shotgun").textContent = killStats.shotgun;
+  $("sb-sniper").textContent = killStats.sniper;
+  $("sb-grenade").textContent = killStats.grenade;
+  $("sb-melee").textContent = killStats.melee;
+  $("sb-head").textContent = killStats.head;
+  $("sb-streak").textContent = killStats.streak;
+  $("stats-board").style.display = "block";
   overEl.style.display = "flex";
   hudEl.style.display = "none";
 }
@@ -1410,12 +1589,17 @@ function shoot() {
       const m = mobs[best];
       const hy = o.y + dir.y * bestT;
       const isHead = hy > m.g.position.y + m.headY;
-      m.hp -= isHead ? w.head : w.dmg;
+      const dmg = isHead ? w.head : w.dmg;
+      m.hp -= dmg;
+      m.lastHitBy = cur; m.lastHitHead = isHead; // 记录击杀来源
       m.flashT = 0.09;
       m.g.position.x += dir.x * 0.3;
       m.g.position.z += dir.z * 0.3;
       endPoint = new THREE.Vector3(o.x + dir.x * bestT, hy, o.z + dir.z * bestT);
       spawnParticles(endPoint.x, endPoint.y, endPoint.z, isHead ? 0xffd833 : 0x8bc34a, 4, 2);
+      // 伤害数字：投影命中点到屏幕
+      const scr = project2D(endPoint);
+      if (scr.visible) spawnDmgNum(scr.x, scr.y, dmg, isHead ? "head" : "");
       hitAny = true;
       headAny = headAny || isHead;
     } else if (bHit) {
@@ -1655,7 +1839,7 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keyup", e => keys[e.code] = false);
 document.addEventListener("mousemove", e => {
   if (!locked) return;
-  const sens = zoomed ? 0.0009 : 0.0023;
+  const sens = (zoomed ? 0.0009 : 0.0023) * mouseSens;
   yaw -= e.movementX * sens;
   pitch -= e.movementY * sens;
   pitch = Math.max(-1.55, Math.min(1.55, pitch));
@@ -1798,6 +1982,7 @@ function startGame() {
   lookId = null;
 
   health = 100; score = 0; kills = 0;
+  resetKillStats();
   grenadeAmmo = 3; meleeCd = 0; meleeT = 0;
   cur = "rifle";
   mags.rifle = WEAPONS.rifle.mag;
@@ -1849,6 +2034,38 @@ $("qualityBtn").addEventListener("click", () => {
   applyQuality(QUALITY_ORDER[(idx + 1) % QUALITY_ORDER.length]);
   updateQualityBtn();
 });
+// 设置面板：开关 + 画质/音量/灵敏度绑定
+const settingsPanel = $("settings-panel");
+const setQualitySel = $("set-quality");
+const setVolumeIn = $("set-volume");
+const setSensIn = $("set-sens");
+let mouseSens = 1.0; // 灵敏度倍率，影响 pointermove
+{
+  let s = null; try { s = localStorage.getItem("fk_sens"); } catch (e) {}
+  if (s) { mouseSens = parseFloat(s) / 100; setSensIn.value = s; }
+  let v = null; try { v = localStorage.getItem("fk_vol"); } catch (e) {}
+  if (v) setVolumeIn.value = v;
+}
+setQualitySel.value = qualityKey;
+function openSettings() {
+  setQualitySel.value = qualityKey;
+  settingsPanel.style.display = "flex";
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+function closeSettings() { settingsPanel.style.display = "none"; }
+$("settingsBtn").addEventListener("click", openSettings);
+$("pauseSettingsBtn").addEventListener("click", openSettings);
+$("set-close").addEventListener("click", closeSettings);
+setQualitySel.addEventListener("change", () => { applyQuality(setQualitySel.value); updateQualityBtn(); });
+setVolumeIn.addEventListener("input", () => { try { localStorage.setItem("fk_vol", setVolumeIn.value); } catch (e) {} applyVolume(); });
+setSensIn.addEventListener("input", () => {
+  mouseSens = parseFloat(setSensIn.value) / 100;
+  try { localStorage.setItem("fk_sens", setSensIn.value); } catch (e) {}
+});
+function applyVolume() {
+  const v = parseFloat(setVolumeIn.value) / 100;
+  if (window._masterGain) window._masterGain.gain.value = v;
+}
 
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
@@ -1863,9 +2080,11 @@ pos.set(W / 2 + 0.5, surfaceY(W / 2, D / 2) + 0.1, D / 2 + 0.5);
 camera.position.set(pos.x, pos.y + EYE, pos.z);
 
 const clock = new THREE.Clock();
+let frameCount = 0;
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
+  frameCount++;
   for (const c of clouds) {
     c.position.x += dt * 0.6;
     if (c.position.x > W + 8) c.position.x = -8;
@@ -1881,6 +2100,8 @@ function loop() {
     updateTNT(dt);
     updateGrenades(dt);
     updateDrops(dt);
+    updateDmgNums(dt);
+    if (frameCount % 3 === 0) drawMinimap(); // 小地图每 3 帧刷新一次，省性能
   }
   renderer.render(scene, camera);
 }
