@@ -657,6 +657,47 @@ function buildGrass() {
   if (grassMesh.instanceColor) grassMesh.instanceColor.needsUpdate = true;
   scene.add(grassMesh);
 }
+// P7.4：远景山体——地图外围放置低多边形山形，营造地平线层次感
+// 用 InstancedMesh 批量渲染，受雾化影响自然淡出，不参与碰撞与阴影
+let mountainMesh = null;
+function buildDistantMountains() {
+  if (mountainMesh) { scene.remove(mountainMesh); mountainMesh.geometry.dispose(); mountainMesh.material.dispose(); }
+  const count = Q === QUALITY_PRESETS.low ? 24 : Q === QUALITY_PRESETS.mid ? 40 : 60;
+  // 单座山：四棱锥形，底边 8-16，高 10-20
+  const geo = new THREE.ConeGeometry(1, 1, 4); // 半径1、高1、4 段 = 金字塔
+  const mat = new THREE.MeshLambertMaterial({ color: 0x4a5a6a, fog: true });
+  mountainMesh = new THREE.InstancedMesh(geo, mat, count);
+  mountainMesh.castShadow = false; // 远景不投影，省性能
+  mountainMesh.receiveShadow = false;
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+  let n = 0;
+  for (let i = 0; i < count && n < count; i++) {
+    // 沿地图外圈分布，距离边缘 12-28 单位
+    const side = Math.floor(Math.random() * 4);
+    let x, z;
+    const off = 12 + Math.random() * 16;
+    if (side === 0) { x = -off + Math.random() * (W + off * 2); z = -off; }       // 北
+    else if (side === 1) { x = -off + Math.random() * (W + off * 2); z = D + off; } // 南
+    else if (side === 2) { x = -off; z = -off + Math.random() * (D + off * 2); }    // 西
+    else { x = W + off; z = -off + Math.random() * (D + off * 2); }                 // 东
+    const h = 8 + Math.random() * 12;
+    const r = 4 + Math.random() * 4;
+    dummy.position.set(x, h / 2 - 2, z); // 底部埋入地下 2 单位，避免悬浮
+    dummy.rotation.y = Math.random() * Math.PI * 2;
+    dummy.scale.set(r, h, r);
+    dummy.updateMatrix();
+    mountainMesh.setMatrixAt(n, dummy.matrix);
+    // 颜色微变化：蓝灰色调，远处略浅（雾会进一步淡化）
+    col.setHSL(0.58 + (Math.random() - 0.5) * 0.05, 0.15, 0.32 + (Math.random() - 0.5) * 0.08);
+    mountainMesh.setColorAt(n, col);
+    n++;
+  }
+  mountainMesh.count = n;
+  mountainMesh.instanceMatrix.needsUpdate = true;
+  if (mountainMesh.instanceColor) mountainMesh.instanceColor.needsUpdate = true;
+  scene.add(mountainMesh);
+}
 
 // ---------------- 区块网格化 ----------------
 const FACES = [
@@ -749,6 +790,8 @@ function applyQuality(key) {
   initWeather();
   // P7.3：草丛数量随画质重建
   buildGrass();
+  // P7.4：远景山体数量随画质重建
+  buildDistantMountains();
 }
 
 // ---------------- 音效 ----------------
@@ -2811,6 +2854,7 @@ function startGame() {
   ac();
   genWorld();
   buildGrass(); // P7.3：重生地形后重建草丛
+  buildDistantMountains(); // P7.4：重建远景山体
   buildAllChunks();
   for (const m of mobs) scene.remove(m.g);
   mobs.length = 0;
@@ -3104,6 +3148,7 @@ addEventListener("resize", () => {
 // ---------------- 主循环 ----------------
 genWorld();
 buildGrass(); // P7.3：初始草丛
+buildDistantMountains(); // P7.4：初始远景山
 buildAllChunks();
 pos.set(W / 2 + 0.5, surfaceY(W / 2, D / 2) + 0.1, D / 2 + 0.5);
 camera.position.set(pos.x, pos.y + EYE, pos.z);
