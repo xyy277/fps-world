@@ -20,6 +20,15 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
 
 ---
 
+## 🚀 Play Now
+
+Open either link in any modern browser:
+
+| Platform | URL | Notes |
+|----------|-----|-------|
+| GitHub Pages | https://xyy277.github.io/fps-world/minecraft-fps.html | Synced with repo, updates on push |
+| Cloudflare Pages | https://fps-world.pages.dev/minecraft-fps.html | Global CDN, faster access |
+
 ## 📸 Screenshots
 
 <div align="center">
@@ -161,15 +170,6 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
 | R3 | Place block | Start | Menu |
 
 > Toggle gamepad in the menu (persisted to save.padEnabled). Analog sticks provide smooth movement and look.
-
-## 🚀 Play Now
-
-Open either link in any modern browser:
-
-| Platform | URL | Notes |
-|----------|-----|-------|
-| GitHub Pages | https://xyy277.github.io/fps-world/minecraft-fps.html | Synced with repo, updates on push |
-| Cloudflare Pages | https://fps-world.pages.dev/minecraft-fps.html | Global CDN, faster access |
 
 ## 💻 Run Locally
 
