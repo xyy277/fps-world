@@ -153,6 +153,17 @@
   #upgrade-panel .up-row button { background: #5a9437; color: #fff; border: none; padding: 4px 12px; cursor: pointer; font-family: inherit; }
   #upgrade-panel .up-row button:disabled { background: #444; cursor: not-allowed; }
   #upgrade-panel .pts { color: #ffd833; }
+  /* ===== P8.3: 通关奖励选择面板 ===== */
+  #reward-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 110; align-items: center; justify-content: center; }
+  #reward-panel .panel { background: #2a2a2a; border: 2px solid #9fd66b; padding: 24px 32px; min-width: 380px; text-align: center; }
+  #reward-panel h2 { color: #9fd66b; margin: 0 0 6px; }
+  #reward-panel .rw-sub { color: #ddd; margin: 0 0 14px; font-size: 13px; }
+  #reward-panel .reward-cards { display: flex; gap: 14px; justify-content: center; }
+  #reward-panel .reward-card { background: #3a3a3a; border: 2px solid #555; padding: 18px 14px; min-width: 110px; cursor: pointer; transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s; user-select: none; }
+  #reward-panel .reward-card:hover { border-color: #ffd833; transform: translateY(-4px); box-shadow: 0 4px 12px rgba(255,216,51,0.3); }
+  #reward-panel .rw-icon { font-size: 32px; margin-bottom: 8px; }
+  #reward-panel .rw-name { color: #ffd833; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+  #reward-panel .rw-desc { color: #ccc; font-size: 12px; line-height: 1.6; }
   /* ===== P5.5: 教程引导层 ===== */
   #tutorial { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); border: 2px solid #9fd66b; color: #fff; padding: 18px 26px; font-size: 15px; line-height: 1.9; z-index: 60; display: none; max-width: 90vw; text-align: center; pointer-events: none; }
   #tutorial b { color: #ffd833; }
@@ -170,7 +181,7 @@
   <div id="stats">
     <div id="daynight">☀ 白天</div>
     <div>得分 <b id="score">0</b></div>
-    <div>波次 <b id="wave">-</b></div>
+    <div>关卡 <b id="level-stat">1</b> · 波次 <b id="wave">-</b></div>
     <div>剩余敌人 <b id="enemies">0</b></div>
     <div>击杀 <b id="kills">0</b></div>
   </div>
@@ -333,6 +344,30 @@
   </div>
 </div>
 
+<div id="reward-panel">
+  <div class="panel">
+    <h2>✦ 通关奖励 ✦</h2>
+    <div class="rw-sub">选择一项强化（本局永久生效，可累积）</div>
+    <div class="reward-cards">
+      <div class="reward-card" id="rw-heal">
+        <div class="rw-icon">❤️</div>
+        <div class="rw-name">战地急救</div>
+        <div class="rw-desc">立即回满生命<br>+25 最大生命</div>
+      </div>
+      <div class="reward-card" id="rw-dmg">
+        <div class="rw-icon">⚔️</div>
+        <div class="rw-name">火力强化</div>
+        <div class="rw-desc">+8% 伤害<br>（本局累积）</div>
+      </div>
+      <div class="reward-card" id="rw-speed">
+        <div class="rw-icon">💨</div>
+        <div class="rw-name">风之疾走</div>
+        <div class="rw-desc">+8% 移速<br>（本局累积）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 /* =====================================================================
@@ -393,6 +428,48 @@ const BLOCKS = {
 };
 const BLOCK_COLORS = { 1:0x5fae3f, 2:0x8a5a2b, 3:0x8a8a8a, 4:0x6b4a22, 5:0x3d7a2a, 6:0xd8c58a, 7:0xa87f3f, 8:0x9a4a3a, 9:0xc04020 };
 const PLACEABLE = [1, 2, 3, 7, 8, 9];
+// P8.1：Biome 定义——4 种地形主题，复用现有方块类型，差异在颜色/高度/装饰/草丛
+// ground=地表方块, sub=地下方块, trunk=树干, leaf=树叶, decor=装饰类型
+const BIOMES = {
+  grassland: {
+    name: "草地",
+    skyDay: 0x87ceeb, skyNight: 0x0b1026, fogDay: 0x87ceeb,
+    ground: 1, sub: 2, bedrock: 3, trunk: 4, leaf: 5,
+    decor: "tree", decorCount: 42,
+    heightBase: 4, heightAmp: 4,
+    grassColor: 0x6ba832, grassCount: [60, 140, 220],
+    mountainColor: 0x4a5a6a,
+  },
+  desert: {
+    name: "沙漠",
+    skyDay: 0xf4d8a0, skyNight: 0x2a1a0a, fogDay: 0xf4d8a0,
+    ground: 6, sub: 6, bedrock: 8, trunk: 4, leaf: 5,  // 仙人掌用原木干 + 叶片顶
+    decor: "cactus", decorCount: 28,
+    heightBase: 3, heightAmp: 2,                      // 沙漠平坦
+    grassColor: 0xddc080, grassCount: [20, 50, 80],   // 枯草，少量
+    mountainColor: 0x8a7a5a,
+  },
+  snow: {
+    name: "雪原",
+    skyDay: 0xc8d8e8, skyNight: 0x1a2030, fogDay: 0xc8d8e8,
+    ground: 6, sub: 3, bedrock: 3, trunk: 4, leaf: 5, // 沙子当雪，石当岩
+    decor: "deadtree", decorCount: 24,
+    heightBase: 5, heightAmp: 5,                      // 雪原崎岖
+    grassColor: 0xe8e8f0, grassCount: [40, 90, 140],  // 雪草偏白
+    mountainColor: 0x6a7a8a,
+  },
+  ruins: {
+    name: "废墟",
+    skyDay: 0x6a5a4a, skyNight: 0x1a0a0a, fogDay: 0x6a5a4a,
+    ground: 3, sub: 2, bedrock: 3, trunk: 8, leaf: 8, // 砖块废墟柱
+    decor: "pillar", decorCount: 32,
+    heightBase: 4, heightAmp: 3,
+    grassColor: 0x5a4a3a, grassCount: [10, 25, 40],   // 废墟少草
+    mountainColor: 0x3a2a2a,
+  },
+};
+const BIOME_ORDER = ["grassland", "desert", "snow", "ruins"];
+let curBiome = BIOMES.grassland;
 
 // ---------------- 武器定义 ----------------
 // bloom: 每发增加的散布；bloomMax: 连发散布上限；bloomRecover: 每秒恢复量
@@ -491,11 +568,20 @@ atlas.width = atlas.height = 64;
 
 // ---------------- Three.js 场景 ----------------
 const scene = new THREE.Scene();
-const SKY_DAY = new THREE.Color(0x87ceeb);
-const SKY_NIGHT = new THREE.Color(0x0b1026);
+// P8.1：天空色改为 let，随 biome 切换
+let SKY_DAY = new THREE.Color(0x87ceeb);
+let SKY_NIGHT = new THREE.Color(0x0b1026);
 const skyTmp = new THREE.Color();
 scene.background = new THREE.Color(0x87ceeb);
 scene.fog = new THREE.Fog(0x87ceeb, Q.fogNear, Q.fogFar);
+// P8.1：应用 biome 主题——切换天空色、雾色、草丛与山体颜色
+function applyBiome(b) {
+  curBiome = b;
+  SKY_DAY.setHex(b.skyDay);
+  SKY_NIGHT.setHex(b.skyNight);
+  scene.background.copy(SKY_DAY);
+  scene.fog.color.copy(SKY_DAY);
+}
 
 const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 300);
 camera.rotation.order = "YXZ";
@@ -577,28 +663,47 @@ function vnoise(x, z) {
 
 function genWorld() {
   world.fill(0);
+  const b = curBiome;
   const cx = W / 2, cz = D / 2;
   for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
-    let h = 4 + Math.floor(4 * vnoise(x * 0.07, z * 0.07) + 2 * vnoise(x * 0.23, z * 0.23));
-    if (Math.hypot(x - cx, z - cz) < 6) h = 5;
+    // P8.1：高度曲线随 biome 变化
+    let h = b.heightBase + Math.floor(b.heightAmp * vnoise(x * 0.07, z * 0.07) + 2 * vnoise(x * 0.23, z * 0.23));
+    if (Math.hypot(x - cx, z - cz) < 6) h = b.heightBase + 1; // 出生点平整
     h = Math.max(2, Math.min(11, h));
     for (let y = 0; y <= h; y++) {
-      setBlock(x, y, z, y < h - 2 ? 3 : (y < h ? 2 : 1));
+      setBlock(x, y, z, y < h - 2 ? b.bedrock : (y < h ? b.sub : b.ground));
     }
   }
-  for (let i = 0; i < 42; i++) {
+  // P8.1：装饰物随 biome 类型生成
+  for (let i = 0; i < b.decorCount; i++) {
     const x = 2 + (Math.random() * (W - 4) | 0), z = 2 + (Math.random() * (D - 4) | 0);
     if (Math.hypot(x - cx, z - cz) < 8) continue;
     const ty = surfaceY(x, z);
-    if (getBlock(x, ty - 1, z) !== 1 || ty + 7 >= H) continue;
-    const th = ty + 3 + (Math.random() * 2 | 0);
-    for (let y = ty; y < th; y++) setBlock(x, y, z, 4);
-    for (let ly = th - 2; ly <= th; ly++) {
-      const r = ly === th ? 1 : 2;
-      for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
-        if (r === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-        if (!getBlock(x + dx, ly, z + dz)) setBlock(x + dx, ly, z + dz, 5);
+    if (getBlock(x, ty - 1, z) !== b.ground || ty + 7 >= H) continue;
+    if (b.decor === "tree") {
+      const th = ty + 3 + (Math.random() * 2 | 0);
+      for (let y = ty; y < th; y++) setBlock(x, y, z, b.trunk);
+      for (let ly = th - 2; ly <= th; ly++) {
+        const r = ly === th ? 1 : 2;
+        for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+          if (r === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+          if (!getBlock(x + dx, ly, z + dz)) setBlock(x + dx, ly, z + dz, b.leaf);
+        }
       }
+    } else if (b.decor === "cactus") {
+      // 仙人掌：1-3 格高的原木干，顶上 1 格叶片
+      const ch = 1 + (Math.random() * 3 | 0);
+      for (let y = 0; y < ch; y++) setBlock(x, ty + y, z, b.trunk);
+      setBlock(x, ty + ch, z, b.leaf);
+    } else if (b.decor === "deadtree") {
+      // 枯木：2-4 格高原木干，无叶
+      const dh = 2 + (Math.random() * 3 | 0);
+      for (let y = 0; y < dh; y++) setBlock(x, ty + y, z, b.trunk);
+    } else if (b.decor === "pillar") {
+      // 废墟柱：2-5 格高砖块柱，顶部偶有横梁
+      const ph = 2 + (Math.random() * 4 | 0);
+      for (let y = 0; y < ph; y++) setBlock(x, ty + y, z, b.trunk);
+      if (Math.random() < 0.4) { setBlock(x + 1, ty + ph - 1, z, b.trunk); setBlock(x - 1, ty + ph - 1, z, b.trunk); }
     }
   }
   for (let i = 0; i < 12; i++) {
@@ -625,11 +730,11 @@ function genWorld() {
 let grassMesh = null;
 function buildGrass() {
   if (grassMesh) { scene.remove(grassMesh); grassMesh.geometry.dispose(); grassMesh.material.dispose(); }
-  // 草丛用细长的绿色盒子，每个略带随机旋转与高度差
-  const count = Q === QUALITY_PRESETS.low ? 60 : Q === QUALITY_PRESETS.mid ? 140 : 220;
+  // P8.1：草丛数量与颜色随 biome
+  const count = curBiome.grassCount[Q === QUALITY_PRESETS.low ? 0 : Q === QUALITY_PRESETS.mid ? 1 : 2];
   const geo = new THREE.BoxGeometry(0.08, 0.4, 0.08);
   geo.translate(0, 0.2, 0);
-  const mat = new THREE.MeshLambertMaterial({ color: 0x6ba832, fog: true });
+  const mat = new THREE.MeshLambertMaterial({ color: curBiome.grassColor, fog: true });
   grassMesh = new THREE.InstancedMesh(geo, mat, count);
   grassMesh.receiveShadow = false;
   grassMesh.castShadow = false; // 草不投影，省性能
@@ -641,7 +746,7 @@ function buildGrass() {
     const z = 2 + Math.random() * (D - 4);
     if (Math.hypot(x - cx, z - cz) < 5) continue;   // 玩家出生点附近不留草
     const y = surfaceY(x, z);
-    if (getBlock(Math.floor(x), y - 1, Math.floor(z)) !== 1) continue; // 只长在草地上
+    if (getBlock(Math.floor(x), y - 1, Math.floor(z)) !== curBiome.ground) continue; // 只长在本地表
     dummy.position.set(x, y, z);
     dummy.rotation.y = Math.random() * Math.PI * 2;
     const s = 0.7 + Math.random() * 0.6;
@@ -649,7 +754,7 @@ function buildGrass() {
     dummy.updateMatrix();
     grassMesh.setMatrixAt(n, dummy.matrix);
     // 颜色微变化
-    grassMesh.setColorAt(n, new THREE.Color(0x6ba832).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1));
+    grassMesh.setColorAt(n, new THREE.Color(curBiome.grassColor).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1));
     n++;
   }
   grassMesh.count = n;
@@ -665,7 +770,7 @@ function buildDistantMountains() {
   const count = Q === QUALITY_PRESETS.low ? 24 : Q === QUALITY_PRESETS.mid ? 40 : 60;
   // 单座山：四棱锥形，底边 8-16，高 10-20
   const geo = new THREE.ConeGeometry(1, 1, 4); // 半径1、高1、4 段 = 金字塔
-  const mat = new THREE.MeshLambertMaterial({ color: 0x4a5a6a, fog: true });
+  const mat = new THREE.MeshLambertMaterial({ color: curBiome.mountainColor, fog: true });
   mountainMesh = new THREE.InstancedMesh(geo, mat, count);
   mountainMesh.castShadow = false; // 远景不投影，省性能
   mountainMesh.receiveShadow = false;
@@ -1508,11 +1613,13 @@ function spawnMob(wave, forceType) {
     skeleton: { hp: 55,  headY: 1.6,  height: 1.95, speed: 1.4 }, // 远程，血薄
     spider:   { hp: 40,  headY: 0.4,  height: 0.8,  speed: 3.2 }, // 快速近战，可跳
   }[type];
+  // P8.2：难度递进——每关敌人 HP 与速度递增（关卡1为基准）
+  const diffMul = 1 + (level - 1) * 0.25; // 每关 +25% HP
   mobs.push({
     type, g, legs, mats,
-    hp: stats.hp, maxHp: stats.hp,
+    hp: Math.round(stats.hp * diffMul), maxHp: Math.round(stats.hp * diffMul),
     headY: stats.headY, height: stats.height,
-    speed: stats.speed + Math.min(wave * 0.12, 1.4) + Math.random() * 0.4,
+    speed: stats.speed + Math.min(wave * 0.12, 1.4) + (level - 1) * 0.15 + Math.random() * 0.4,
     atkCd: 0, flashT: 0, fuse: 0, t: Math.random() * 10,
     jumpCd: 0, // P6.2：蜘蛛跳跃冷却
     // FSM 状态机字段
@@ -1542,7 +1649,8 @@ function spawnBoss(wave) {
   scene.add(g);
   enableShadow(g); // P7.1：Boss 投射阴影
 
-  const baseHp = 800 + Math.floor(wave / 5) * 400; // 每 5 波 Boss 血量递增
+  // P8.2：Boss 血量随波次 + 关卡双重递增
+  const baseHp = Math.round((800 + Math.floor(wave / 5) * 400) * (1 + (level - 1) * 0.3));
   mobs.push({
     type: "boss", g, legs, mats,
     hp: baseHp, maxHp: baseHp,
@@ -1929,6 +2037,9 @@ let maxHp = 100; // 由升级系统修正（Phase 4.3）
 let cur = "pistol"; // P6.1：初始武器改为手枪（随身备用）
 const mags = { pistol: 12, rifle: 30, shotgun: 6, sniper: 5, rocket: 1 };
 let wave = 0, waveState = "clear", spawnTimer = 2.5;
+let level = 1; // P8.2：关卡数，每 5 波为一关，通关进入下一 biome
+let runBuffs = { dmg: 0, speed: 0, maxHp: 0 }; // P8.3：本局通关奖励 buff（累积，每局重置）
+let rewardOpen = false; // P8.3：通关奖励面板打开中（暂停波次推进与玩家输入）
 let reloading = false, reloadT = 0, reloadDur = 0; // reloadDur = 本次装填总时长（受升级影响）
 let shooting = false, fireCd = 0, gunKick = 0, flashT = 0, shakeT = 0;
 let bloom = 0; // 当前动态散布（连发增大，停火恢复）
@@ -2116,10 +2227,10 @@ function updateLevelBar() {
 function getUpgradedStats() {
   const u = save.upgrades;
   return {
-    dmgMul: 1 + u.dmg * 0.10,        // 伤害 +10% 每级
-    maxHp: 100 + u.hp * 15,          // 最大生命 +15 每级
-    reloadMul: 1 - u.reload * 0.10,  // 换弹时间 -10% 每级
-    speedMul: 1 + u.speed * 0.08,    // 移速 +8% 每级
+    dmgMul: (1 + u.dmg * 0.10) * (1 + runBuffs.dmg * 0.08),      // 伤害：升级 +10%/级 × 本局buff +8%/次
+    maxHp: 100 + u.hp * 15 + runBuffs.maxHp,                      // 最大生命：升级 +15/级 + 本局buff +25/次
+    reloadMul: 1 - u.reload * 0.10,                               // 换弹时间 -10% 每级
+    speedMul: (1 + u.speed * 0.08) * (1 + runBuffs.speed * 0.08), // 移速：升级 +8%/级 × 本局buff +8%/次
   };
 }
 // 当前生效的升级属性（每局开始时刷新；升级面板改动后也立即刷新）
@@ -2190,6 +2301,8 @@ function updateHUD() {
   $("score").textContent = score;
   $("kills").textContent = kills;
   $("wave").textContent = wave === 0 ? "-" : wave;
+  const lvEl = $("level-stat");
+  if (lvEl) lvEl.textContent = level; // P8.2：HUD 显示当前关卡数
   $("enemies").textContent = mobs.length;
   $("health-fill").style.width = Math.max(0, Math.min(100, health / maxHp * 100)) + "%";
   $("weapon").textContent = WEAPONS[cur].name + (cur === "sniper" ? (touchMode ? "（镜 狙击）" : "（F 狙击镜）") : "");
@@ -2264,6 +2377,8 @@ function damagePlayer(d) {
 }
 function gameOver() {
   state = "over";
+  rewardOpen = false; // P8.3：确保奖励面板状态清除
+  if (rewardPanel) rewardPanel.style.display = "none";
   aiming = false; if (zoomed) { zoomed = false; } applyAimFov();  // 结束时复位 FOV
   clearTouchInput();
   if (document.pointerLockElement) document.exitPointerLock();
@@ -2553,19 +2668,31 @@ function updatePlayer(dt) {
 
 // ---------------- 波次 ----------------
 function updateWave(dt) {
+  if (rewardOpen) return; // P8.3：通关奖励面板打开时暂停波次推进
   if (mobs.length === 0) {
     if (waveState === "fighting") {
       waveState = "clear";
       score += wave * 5;
       health = Math.min(maxHp, health + 25);
-      banner("第 " + wave + " 波已清空！生命 +25");
-      sfx.clear();
+      // P8.2：每 5 波通关——切换 biome 进入下一关
+      if (wave > 0 && wave % 5 === 0) {
+        level++;
+        const nextBiome = BIOMES[BIOME_ORDER[(level - 1) % BIOME_ORDER.length]];
+        applyBiome(nextBiome);
+        genWorld(); buildGrass(); buildDistantMountains(); buildAllChunks();
+        banner("✦ 通关！进入关卡 " + level + "：" + nextBiome.name + " ✦");
+        sfx.clear();
+        showReward(); // P8.3：弹出通关奖励选择面板（内部设置 spawnTimer）
+      } else {
+        banner("第 " + wave + " 波已清空！生命 +25");
+        sfx.clear();
+        spawnTimer = 3;
+      }
       // Phase 4.2：波次/得分类成就实时检测
       checkAchievements({
         bestWave: Math.max(save.bestWave, wave),
         bestScore: Math.max(save.bestScore, score),
       });
-      spawnTimer = 3;
       updateHUD();
     } else {
       spawnTimer -= dt;
@@ -2739,6 +2866,7 @@ document.addEventListener("contextmenu", e => e.preventDefault());
 document.addEventListener("pointerlockchange", () => {
   locked = document.pointerLockElement === canvas;
   if (touchMode) return;                     // 触屏模式不走指针锁定
+  if (rewardOpen) return;                    // P8.3：奖励面板打开时不触发暂停/恢复
   if (!locked && state === "playing") {
     state = "paused";
     shooting = false;
@@ -2881,6 +3009,10 @@ function startGame() {
   mags.shotgun = WEAPONS.shotgun.mag;
   mags.sniper = WEAPONS.sniper.mag;
   wave = 0; waveState = "clear"; spawnTimer = 2.5;
+  level = 1; // P8.2：重置关卡数
+  runBuffs = { dmg: 0, speed: 0, maxHp: 0 }; // P8.3：重置本局通关 buff
+  rewardOpen = false; // P8.3：确保奖励面板状态重置
+  if (rewardPanel) rewardPanel.style.display = "none";
   reloading = false; shooting = false; fireCd = 0; bloom = 0; gunKick = 0;
   aiming = false;
   if (zoomed) { zoomed = false; }
@@ -3136,6 +3268,45 @@ $("go-progressBtn").addEventListener("click", openProgress);
 // 暂停界面同样提供入口
 $("pauseUpgradeBtn").addEventListener("click", openUpgrade);
 $("pauseProgressBtn").addEventListener("click", openProgress);
+
+// ---------------- P8.3：通关奖励系统 ----------------
+const rewardPanel = $("reward-panel");
+// 弹出通关奖励面板：暂停游戏（state→paused），退出指针锁定让玩家可点击卡片
+function showReward() {
+  rewardOpen = true;
+  state = "paused";           // 暂停主循环更新（敌人/玩家/粒子均冻结）
+  shooting = false;
+  aiming = false; applyAimFov();
+  rewardPanel.style.display = "flex";
+  if (locked) document.exitPointerLock(); // 释放鼠标，玩家可点击选择
+}
+// 应用所选奖励并恢复游戏
+function applyReward(type) {
+  if (!rewardOpen) return;
+  if (type === "heal") {
+    runBuffs.maxHp += 25;     // +25 最大生命（本局累积）
+    refreshUpStats();
+    health = maxHp;           // 回满
+  } else if (type === "dmg") {
+    runBuffs.dmg++;           // +8% 伤害（本局累积）
+    refreshUpStats();
+  } else if (type === "speed") {
+    runBuffs.speed++;         // +8% 移速（本局累积）
+    refreshUpStats();
+  }
+  rewardOpen = false;
+  rewardPanel.style.display = "none";
+  spawnTimer = 5;             // 给玩家 5s 准备下一关
+  state = "playing";          // 恢复游戏
+  if (!touchMode) canvas.requestPointerLock(); // 重新锁定鼠标
+  sfx.pickup();
+  updateHUD();
+  const labels = { heal: "战地急救（回满血 +25 最大生命）", dmg: "火力强化（+8% 伤害）", speed: "风之疾走（+8% 移速）" };
+  banner("✦ " + labels[type] + " 已应用！准备迎接关卡 " + level + " ✦");
+}
+rewardPanel.querySelector("#rw-heal").addEventListener("click", () => applyReward("heal"));
+rewardPanel.querySelector("#rw-dmg").addEventListener("click", () => applyReward("dmg"));
+rewardPanel.querySelector("#rw-speed").addEventListener("click", () => applyReward("speed"));
 // 初始刷新一次（菜单等级条 / 属性）
 updateLevelBar();
 
