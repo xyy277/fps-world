@@ -138,6 +138,14 @@
   #boss-bar .bar { height: 12px; background: rgba(0,0,0,0.6); border: 2px solid #ffd833; margin-top: 4px; }
   #boss-bar .fill { height: 100%; background: linear-gradient(#ff5555, #aa1111); transition: width .2s; }
   body.touch-mode #boss-bar { width: 240px; font-size: 12px; top: 10px; }
+  /* P6.4：主动技能栏——底部中央三个圆形按钮，显示冷却覆盖 */
+  #skill-bar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: none; }
+  body.touch-mode #skill-bar { bottom: 56px; }
+  body:not(.touch-mode) #skill-bar { display: none; } /* PC 模式默认隐藏，按 E/Z/X 即可；触屏模式显示按钮 */
+  .skill-slot { width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,.55); border: 2px solid #555; position: relative; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; text-shadow: 1px 1px 0 #000; pointer-events: auto; }
+  .skill-slot.ready { border-color: #9fd66b; }
+  .skill-slot.active { border-color: #ffd833; box-shadow: 0 0 8px #ffd833; }
+  .skill-slot .cd-overlay { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(0,0,0,0.6) var(--cd, 0%), transparent 0); pointer-events: none; }
   #upgrade-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; }
   #upgrade-panel .panel { background: #2a2a2a; border: 2px solid #555; padding: 24px 32px; min-width: 340px; }
   #upgrade-panel h2 { color: #fff; margin: 0 0 8px; }
@@ -178,6 +186,11 @@
   <div id="level-bar"><div id="level-text">Lv.1</div><div class="bar"><div class="fill" id="level-fill" style="width:0%"></div></div></div>
   <div id="achv-toast"></div>
   <div id="boss-bar"><div id="boss-name">僵尸王</div><div class="bar"><div class="fill" id="boss-fill" style="width:100%"></div></div></div>
+  <div id="skill-bar">
+    <div class="skill-slot" id="sk-sprint"><span>冲刺</span><div class="cd-overlay"></div></div>
+    <div class="skill-slot" id="sk-shield"><span>护盾</span><div class="cd-overlay"></div></div>
+    <div class="skill-slot" id="sk-timewarp"><span>时停</span><div class="cd-overlay"></div></div>
+  </div>
 </div>
 <div id="hurt"></div>
 <div id="tutorial"></div>
@@ -207,10 +220,12 @@
       <tr><td class="k">W A S D</td><td>移动</td><td class="k">鼠标</td><td>视角</td></tr>
       <tr><td class="k">左键</td><td>射击（可击碎方块 / 引爆TNT）</td><td class="k">右键</td><td>瞄准射击（ADS，散布减半）</td></tr>
       <tr><td class="k">Q / 滚轮</td><td>切换武器（手枪/步枪/霰弹/狙击/火箭筒）</td><td class="k">F</td><td>狙击镜（仅狙击枪）</td></tr>
-      <tr><td class="k">E / 中键</td><td>放置方块</td><td class="k">1 - 6</td><td>选择方块（6 = TNT）</td></tr>
+      <tr><td class="k">C / 中键</td><td>放置方块</td><td class="k">1 - 6</td><td>选择方块（6 = TNT）</td></tr>
       <tr><td class="k">R</td><td>装填弹药</td><td class="k">G</td><td>投手雷</td></tr>
-      <tr><td class="k">V</td><td>近战挥刀</td><td class="k">Shift</td><td>疾跑</td></tr>
-      <tr><td class="k">空格</td><td>跳跃</td><td class="k">ESC</td><td>暂停</td></tr>
+      <tr><td class="k">E</td><td>主动技能：冲刺</td><td class="k">Z</td><td>主动技能：护盾</td></tr>
+      <tr><td class="k">X</td><td>主动技能：时停</td><td class="k">V</td><td>近战挥刀</td></tr>
+      <tr><td class="k">Shift</td><td>疾跑</td><td class="k">空格</td><td>跳跃</td></tr>
+      <tr><td class="k">ESC</td><td>暂停</td><td class="k"></td><td></td></tr>
     </table>
   </div>
   <div class="panel" id="controls-touch">
@@ -1107,6 +1122,37 @@ function melee() {
   }
   cleanupDead();
 }
+// P6.4：主动技能——冲刺 / 护盾 / 时停，冷却驱动
+function useSkill(name) {
+  if (state !== "playing") return;
+  const s = SKILLS[name];
+  if (!s || s.cd1 > 0 || s.active > 0) return; // 冷却中或已激活
+  s.cd1 = s.cd;
+  s.active = s.dur;
+  sfx.switchW();
+  if (name === "sprint") {
+    banner("冲刺！");
+    spawnParticles(pos.x, pos.y + 1, pos.z, 0x66ccff, 12, 3);
+  } else if (name === "shield") {
+    banner("护盾激活！");
+    spawnParticles(pos.x, pos.y + 1, pos.z, 0x33aaff, 20, 4);
+  } else if (name === "timewarp") {
+    timeScale = 0.25;                       // 敌人时间缩放
+    banner("时间减缓！");
+    spawnParticles(pos.x, pos.y + 1, pos.z, 0xaa66ff, 25, 5);
+  }
+}
+function updateSkills(dt) {
+  if (state !== "playing") return;
+  for (const name in SKILLS) {
+    const s = SKILLS[name];
+    if (s.cd1 > 0) s.cd1 = Math.max(0, s.cd1 - dt);
+    if (s.active > 0) {
+      s.active = Math.max(0, s.active - dt);
+      if (s.active === 0 && name === "timewarp") timeScale = 1; // 时停结束恢复
+    }
+  }
+}
 
 // ---------------- 怪物 AI：A* 寻路 + FSM 状态机 ----------------
 // 通行判断：该格地面以上 2 格须为空（mob 高约 2）
@@ -1771,6 +1817,14 @@ let reloading = false, reloadT = 0, reloadDur = 0; // reloadDur = 本次装填�
 let shooting = false, fireCd = 0, gunKick = 0, flashT = 0, shakeT = 0;
 let bloom = 0; // 当前动态散布（连发增大，停火恢复）
 let selSlot = 0, zoomed = false, aiming = false; // aiming: 右键 ADS 瞄准（所有武器）；zoomed: 狙击高倍镜（仅狙击枪）
+// P6.4：主动技能系统——冲刺 / 护盾 / 时停，冷却驱动
+// cd 剩余冷却秒数（0=可用）；active 剩余持续秒数（0=未激活）
+const SKILLS = {
+  sprint: { name: "冲刺", key: "KeyE", cd: 8,    dur: 1.5, cd1: 0, active: 0 }, // 1.5s 加速 50%，8s 冷却
+  shield: { name: "护盾", key: "KeyZ", cd: 15,   dur: 4,   cd1: 0, active: 0 }, // 4s 减伤 70%，15s 冷却
+  timewarp: { name: "时停", key: "KeyX", cd: 25, dur: 3,   cd1: 0, active: 0 }, // 3s 敌人移速*0.2，25s 冷却
+};
+let timeScale = 1; // 全局时间缩放（时停影响敌人更新）
 let bobPhase = 0;
 let dayT = 0.12, curNightF = 0, nightAnnounced = false;
 const pos = new THREE.Vector3(W / 2 + 0.5, 8, D / 2 + 0.5);
@@ -2037,6 +2091,16 @@ function updateHUD() {
   } else {
     bossBar.style.display = "none";
   }
+  // P6.4：技能栏冷却显示
+  const skMap = { sprint: "sk-sprint", shield: "sk-shield", timewarp: "sk-timewarp" };
+  for (const name in skMap) {
+    const s = SKILLS[name];
+    const el = $(skMap[name]);
+    el.classList.toggle("ready", s.cd1 === 0 && s.active === 0);
+    el.classList.toggle("active", s.active > 0);
+    const cdPct = s.cd1 > 0 ? (s.cd1 / s.cd * 100) : 0;
+    el.querySelector(".cd-overlay").style.setProperty("--cd", cdPct + "%");
+  }
 }
 
 // 热键栏
@@ -2069,6 +2133,8 @@ function selectSlot(i) {
 // ---------------- 玩家伤害 / 死亡 ----------------
 function damagePlayer(d) {
   if (state !== "playing" || d <= 0) return;
+  // P6.4：护盾激活时减伤 70%
+  if (SKILLS.shield.active > 0) d = Math.round(d * 0.3);
   health -= d;
   shakeT = Math.max(shakeT, 0.3);
   hurtEl.style.opacity = 0.85;
@@ -2277,7 +2343,9 @@ function collideAxis(axis) {
 }
 function updatePlayer(dt) {
   const sprint = keys["ShiftLeft"] || keys["ShiftRight"] || dpad.sprint;
-  const speed = (sprint ? 7.4 : 4.9) * upStats.speedMul; // Phase 4.3：移速升级
+  // P6.4：冲刺技能激活时额外 +50% 移速
+  const skillBoost = SKILLS.sprint.active > 0 ? 1.5 : 1;
+  const speed = (sprint ? 7.4 : 4.9) * upStats.speedMul * skillBoost;
   let ix = 0, iz = 0;
   if (keys["KeyW"] || dpad.up) iz += 1;
   if (keys["KeyS"] || dpad.down) iz -= 1;
@@ -2510,10 +2578,14 @@ document.addEventListener("keydown", e => {
   if (state !== "playing") return;
   if (e.code === "KeyR") startReload();
   if (e.code === "KeyQ") switchWeapon(1);
-  if (e.code === "KeyE") placeBlock();   // E 键放方块（原右键功能迁移）
+  if (e.code === "KeyC") placeBlock();   // C 键放方块（建造功能，P6.4 改键释放 E 给主动技能）
   if (e.code === "KeyF") toggleZoom();
   if (e.code === "KeyG") throwGrenade();
   if (e.code === "KeyV") melee();
+  // P6.4：主动技能快捷键
+  if (e.code === "KeyE") useSkill("sprint");
+  if (e.code === "KeyZ") useSkill("shield");
+  if (e.code === "KeyX") useSkill("timewarp");
   if (e.code.startsWith("Digit")) {
     const n = +e.code.slice(5);
     if (n >= 1 && n <= PLACEABLE.length) selectSlot(n - 1);
@@ -2637,6 +2709,10 @@ bindTap("btn-weapon", () => { if (state === "playing") switchWeapon(1); });
 bindTap("btn-zoom",   () => toggleZoom());
 bindTap("btn-grenade", () => { if (state === "playing") throwGrenade(); });
 bindTap("btn-melee",   () => { if (state === "playing") melee(); });
+// P6.4：触屏技能按钮（仅触屏模式可见）
+bindTap("sk-sprint",   () => useSkill("sprint"));
+bindTap("sk-shield",   () => useSkill("shield"));
+bindTap("sk-timewarp", () => useSkill("timewarp"));
 bindTap("btn-sprint", () => {
   dpad.sprint = !dpad.sprint;
   $("btn-sprint").classList.toggle("on", dpad.sprint);
@@ -2685,6 +2761,9 @@ function startGame() {
   aiming = false;
   if (zoomed) { zoomed = false; }
   applyAimFov();
+  // P6.4：重置技能冷却
+  for (const k in SKILLS) { SKILLS[k].cd1 = 0; SKILLS[k].active = 0; }
+  timeScale = 1;
   updateGunModel();
   pos.set(W / 2 + 0.5, surfaceY(W / 2, D / 2) + 0.1, D / 2 + 0.5);
   vel.set(0, 0, 0);
@@ -2720,7 +2799,8 @@ function showTutorial() {
       "<b>WASD</b> 移动 · <b>Shift</b> 疾跑 · <b>空格</b> 跳跃<br>" +
       "<b>鼠标</b> 视角 · <b>左键</b> 射击 · <b>右键</b> 瞄准<br>" +
       "<b>R</b> 换弹 · <b>Q</b> 切武器 · <b>F</b> 狙击镜<br>" +
-      "<b>G</b> 手雷 · <b>V</b> 近战 · <b>E</b> 放方块 · <b>1-6</b> 选方块";
+      "<b>G</b> 手雷 · <b>V</b> 近战 · <b>C</b> 放方块 · <b>1-6</b> 选方块<br>" +
+      "<b>E</b> 冲刺 · <b>Z</b> 护盾 · <b>X</b> 时停（主动技能）";
   el.style.display = "block";
   setTimeout(() => { el.style.display = "none"; }, 6000);
 }
@@ -2962,13 +3042,15 @@ function loop() {
   if (boomLight.intensity > 0) boomLight.intensity = Math.max(0, boomLight.intensity - dt * 8);
   if (state === "playing") {
     updatePlayer(dt);
-    updateMobs(dt);
+    updateSkills(dt); // P6.4：技能冷却递减
+    // P6.4：时停期间敌人/手雷/掉落物按 timeScale 慢速更新；玩家与粒子不受影响
+    updateMobs(dt * timeScale);
     updateWave(dt);
     updateParticles(dt);
     updateTracers(dt);
-    updateTNT(dt);
-    updateGrenades(dt);
-    updateDrops(dt);
+    updateTNT(dt * timeScale);
+    updateGrenades(dt * timeScale);
+    updateDrops(dt * timeScale);
     updateDmgNums(dt);
     if (frameCount % 3 === 0) drawMinimap(); // 小地图每 3 帧刷新一次，省性能
   }
