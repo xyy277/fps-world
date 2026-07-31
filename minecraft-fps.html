@@ -509,20 +509,46 @@ document.body.appendChild(renderer.domElement);
 // 避免引入 EffectComposer 额外 CDN 依赖。开启时高光更柔和、画面更通透。
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
+// P7.1：阴影贴图——中高画质开启，给场景注入体积感与纵深
+if (Q !== QUALITY_PRESETS.low) {
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+}
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0x557744, 0.95);
+// P7.1：光照升级——暖色调天空光 + 暖太阳光 + 冷色环境补光，接近 AI 概念图黄昏氛围
+const hemi = new THREE.HemisphereLight(0xffe8c4, 0x5a6e3a, 0.85); // 暖天空 / 冷地面
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff2d8, 0.75);
+const sun = new THREE.DirectionalLight(0xffd9a0, 1.1);             // 暖太阳光，强度提升
 sun.position.set(30, 60, 20);
+// P7.1：太阳投射阴影（仅中高画质）
+if (Q !== QUALITY_PRESETS.low) {
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 1024;
+  sun.shadow.mapSize.height = 1024;
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 120;
+  sun.shadow.camera.left = -40;
+  sun.shadow.camera.right = 40;
+  sun.shadow.camera.top = 40;
+  sun.shadow.camera.bottom = -40;
+  sun.shadow.bias = -0.0008;
+}
 scene.add(sun);
+scene.add(sun.target); // P7.1：阴影跟随玩家所需
 const boomLight = new THREE.PointLight(0xff9040, 0, 20);
 scene.add(boomLight);
+// P7.1：冷色补光——从反方向打一点冷光，增加明暗对比与层次
+const rim = new THREE.DirectionalLight(0x88aacc, 0.25);
+rim.position.set(-25, 20, -15);
+scene.add(rim);
 
 const atlasTex = new THREE.CanvasTexture(atlas);
 atlasTex.magFilter = THREE.NearestFilter;
 atlasTex.minFilter = THREE.NearestFilter;
 atlasTex.generateMipmaps = false;
 const worldMat = new THREE.MeshLambertMaterial({ map: atlasTex });
+// P7.1：方块网格接收阴影
+worldMat.receiveShadow = true;
 
 // ---------------- 世界数据 ----------------
 const world = new Uint8Array(W * D * H);
@@ -595,6 +621,42 @@ function genWorld() {
     setBlock(0, y, i, 8); setBlock(W - 1, y, i, 8);
   }
 }
+// P7.3：草丛装饰——InstancedMesh 批量渲染，几乎零开销
+let grassMesh = null;
+function buildGrass() {
+  if (grassMesh) { scene.remove(grassMesh); grassMesh.geometry.dispose(); grassMesh.material.dispose(); }
+  // 草丛用细长的绿色盒子，每个略带随机旋转与高度差
+  const count = Q === QUALITY_PRESETS.low ? 60 : Q === QUALITY_PRESETS.mid ? 140 : 220;
+  const geo = new THREE.BoxGeometry(0.08, 0.4, 0.08);
+  geo.translate(0, 0.2, 0);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x6ba832, fog: true });
+  grassMesh = new THREE.InstancedMesh(geo, mat, count);
+  grassMesh.receiveShadow = false;
+  grassMesh.castShadow = false; // 草不投影，省性能
+  const dummy = new THREE.Object3D();
+  const cx = W / 2, cz = D / 2;
+  let n = 0;
+  for (let i = 0; i < count * 3 && n < count; i++) {
+    const x = 2 + Math.random() * (W - 4);
+    const z = 2 + Math.random() * (D - 4);
+    if (Math.hypot(x - cx, z - cz) < 5) continue;   // 玩家出生点附近不留草
+    const y = surfaceY(x, z);
+    if (getBlock(Math.floor(x), y - 1, Math.floor(z)) !== 1) continue; // 只长在草地上
+    dummy.position.set(x, y, z);
+    dummy.rotation.y = Math.random() * Math.PI * 2;
+    const s = 0.7 + Math.random() * 0.6;
+    dummy.scale.set(1, s, 1);
+    dummy.updateMatrix();
+    grassMesh.setMatrixAt(n, dummy.matrix);
+    // 颜色微变化
+    grassMesh.setColorAt(n, new THREE.Color(0x6ba832).offsetHSL(0, 0, (Math.random() - 0.5) * 0.1));
+    n++;
+  }
+  grassMesh.count = n;
+  grassMesh.instanceMatrix.needsUpdate = true;
+  if (grassMesh.instanceColor) grassMesh.instanceColor.needsUpdate = true;
+  scene.add(grassMesh);
+}
 
 // ---------------- 区块网格化 ----------------
 const FACES = [
@@ -641,6 +703,7 @@ function buildChunk(cx, cz) {
   const old = chunkMeshes[key];
   if (old) { scene.remove(old); old.geometry.dispose(); }
   const mesh = new THREE.Mesh(geo, worldMat);
+  mesh.receiveShadow = true; // P7.1：方块接收阴影
   scene.add(mesh);
   chunkMeshes[key] = mesh;
 }
@@ -684,6 +747,8 @@ function applyQuality(key) {
   while (clouds.length < Q.clouds) makeCloud();
   // P5.3：天气粒子数随画质重建
   initWeather();
+  // P7.3：草丛数量随画质重建
+  buildGrass();
 }
 
 // ---------------- 音效 ----------------
@@ -1359,6 +1424,11 @@ function buildBossModel(g, mats, legs) {
   g.add(legL, legR, body, chest, armL, armR, head, eyeL, eyeR);
   legs.push(legL, legR);
 }
+// P7.1：让敌人/投掷物网格投射阴影（中高画质生效）
+function enableShadow(g) {
+  if (!renderer.shadowMap.enabled) return;
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+}
 function spawnMob(wave, forceType) {
   // P6.2：敌人类型随波次解锁——zombie(1+) / creeper(2+) / spider(3+) / skeleton(4+)
   // P6.3：Boss 由 spawnBoss 单独生成，不走此函数
@@ -1386,6 +1456,7 @@ function spawnMob(wave, forceType) {
   else buildZombieModel(g, mats, legs);
   g.position.set(x, surfaceY(x, z), z);
   scene.add(g);
+  enableShadow(g); // P7.1：敌人投射阴影
 
   // P6.2：各敌人属性差异化
   const stats = {
@@ -1426,6 +1497,7 @@ function spawnBoss(wave) {
   buildBossModel(g, mats, legs);
   g.position.set(x, surfaceY(x, z), z);
   scene.add(g);
+  enableShadow(g); // P7.1：Boss 投射阴影
 
   const baseHp = 800 + Math.floor(wave / 5) * 400; // 每 5 波 Boss 血量递增
   mobs.push({
@@ -1457,6 +1529,7 @@ function spawnMobAt(type, x, z) {
   else buildZombieModel(g, mats, legs);
   g.position.set(x, surfaceY(x, z), z);
   scene.add(g);
+  enableShadow(g); // P7.1：召唤物投射阴影
   const stats = {
     zombie:   { hp: 100, headY: 1.45, height: 1.95, speed: 1.6 },
     creeper:  { hp: 60,  headY: 1.5,  height: 2.0,  speed: 2.0 },
@@ -2482,8 +2555,14 @@ function updateDayNight(dt) {
   skyTmp.copy(SKY_DAY).lerp(SKY_NIGHT, f);
   scene.background.copy(skyTmp);
   scene.fog.color.copy(skyTmp);
-  sun.intensity = 0.75 * (1 - f * 0.85);
-  hemi.intensity = 0.95 * (1 - f * 0.7);
+  // P7.2：夜间雾拉近，营造压迫感与不可知感；白天拉开保证视野
+  scene.fog.near = Q.fogNear * (1 - f * 0.3);
+  scene.fog.far = Q.fogFar * (1 - f * 0.25);
+  // P7.1：昼夜光照强度与色温联动
+  sun.intensity = 1.1 * (1 - f * 0.85);
+  sun.color.setHex(0xffd9a0).lerp(new THREE.Color(0x4a5a8a), f * 0.6); // 夜间太阳变冷
+  hemi.intensity = 0.85 * (1 - f * 0.7);
+  hemi.color.setHex(0xffe8c4).lerp(new THREE.Color(0x2a3a5a), f * 0.7); // 夜间天空光变冷
   if (state === "playing") {
     if (f > 0.99 && !nightAnnounced) {
       nightAnnounced = true;
@@ -2731,6 +2810,7 @@ bindTap("btn-pause", () => {
 function startGame() {
   ac();
   genWorld();
+  buildGrass(); // P7.3：重生地形后重建草丛
   buildAllChunks();
   for (const m of mobs) scene.remove(m.g);
   mobs.length = 0;
@@ -3023,6 +3103,7 @@ addEventListener("resize", () => {
 
 // ---------------- 主循环 ----------------
 genWorld();
+buildGrass(); // P7.3：初始草丛
 buildAllChunks();
 pos.set(W / 2 + 0.5, surfaceY(W / 2, D / 2) + 0.1, D / 2 + 0.5);
 camera.position.set(pos.x, pos.y + EYE, pos.z);
@@ -3037,6 +3118,10 @@ function loop() {
     c.position.x += dt * 0.6;
     if (c.position.x > W + 8) c.position.x = -8;
   }
+  // P7.1：太阳与阴影相机跟随玩家，保证阴影始终覆盖玩家周围
+  sun.position.set(pos.x + 30, pos.y + 60, pos.z + 20);
+  sun.target.position.copy(pos);
+  sun.target.updateMatrixWorld();
   updateDayNight(dt);
   updateWeather(dt); // P5.3：天气粒子更新（内部判断开关与状态）
   if (boomLight.intensity > 0) boomLight.intensity = Math.max(0, boomLight.intensity - dt * 8);
