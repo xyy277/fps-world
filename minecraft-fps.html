@@ -199,11 +199,12 @@
   <div class="panel" id="controls-pc">
     <table>
       <tr><td class="k">W A S D</td><td>移动</td><td class="k">鼠标</td><td>视角</td></tr>
-      <tr><td class="k">左键</td><td>射击（可击碎方块 / 引爆TNT）</td><td class="k">右键</td><td>放置方块</td></tr>
-      <tr><td class="k">Q / 滚轮</td><td>切换武器（步枪/霰弹/狙击）</td><td class="k">F</td><td>狙击瞄准镜</td></tr>
-      <tr><td class="k">1 - 6</td><td>选择方块（6 = TNT）</td><td class="k">R</td><td>装填弹药</td></tr>
-      <tr><td class="k">Shift</td><td>疾跑</td><td class="k">空格</td><td>跳跃</td></tr>
-      <tr><td class="k">ESC</td><td>暂停</td><td class="k"></td><td></td></tr>
+      <tr><td class="k">左键</td><td>射击（可击碎方块 / 引爆TNT）</td><td class="k">右键</td><td>瞄准射击（ADS，散布减半）</td></tr>
+      <tr><td class="k">Q / 滚轮</td><td>切换武器（手枪/步枪/霰弹/狙击/火箭筒）</td><td class="k">F</td><td>狙击镜（仅狙击枪）</td></tr>
+      <tr><td class="k">E / 中键</td><td>放置方块</td><td class="k">1 - 6</td><td>选择方块（6 = TNT）</td></tr>
+      <tr><td class="k">R</td><td>装填弹药</td><td class="k">G</td><td>投手雷</td></tr>
+      <tr><td class="k">V</td><td>近战挥刀</td><td class="k">Shift</td><td>疾跑</td></tr>
+      <tr><td class="k">空格</td><td>跳跃</td><td class="k">ESC</td><td>暂停</td></tr>
     </table>
   </div>
   <div class="panel" id="controls-touch">
@@ -1601,7 +1602,7 @@ let wave = 0, waveState = "clear", spawnTimer = 2.5;
 let reloading = false, reloadT = 0, reloadDur = 0; // reloadDur = 本次装填总时长（受升级影响）
 let shooting = false, fireCd = 0, gunKick = 0, flashT = 0, shakeT = 0;
 let bloom = 0; // 当前动态散布（连发增大，停火恢复）
-let selSlot = 0, zoomed = false;
+let selSlot = 0, zoomed = false, aiming = false; // aiming: 右键 ADS 瞄准（所有武器）；zoomed: 狙击高倍镜（仅狙击枪）
 let bobPhase = 0;
 let dayT = 0.12, curNightF = 0, nightAnnounced = false;
 const pos = new THREE.Vector3(W / 2 + 0.5, 8, D / 2 + 0.5);
@@ -1846,7 +1847,7 @@ function updateHUD() {
   $("wave").textContent = wave === 0 ? "-" : wave;
   $("enemies").textContent = mobs.length;
   $("health-fill").style.width = Math.max(0, Math.min(100, health / maxHp * 100)) + "%";
-  $("weapon").textContent = WEAPONS[cur].name + (cur === "sniper" ? (touchMode ? "（镜 瞄准）" : "（F 瞄准）") : "");
+  $("weapon").textContent = WEAPONS[cur].name + (cur === "sniper" ? (touchMode ? "（镜 狙击）" : "（F 狙击镜）") : "");
   if (reloading) { ammoEl.textContent = "装填中…"; ammoEl.className = "reloading"; }
   else { ammoEl.innerHTML = mags[cur] + " <small>/ ∞</small>"; ammoEl.className = ""; }
   const ge = $("grenade");
@@ -1896,6 +1897,7 @@ function damagePlayer(d) {
 }
 function gameOver() {
   state = "over";
+  aiming = false; if (zoomed) { zoomed = false; } applyAimFov();  // 结束时复位 FOV
   clearTouchInput();
   if (document.pointerLockElement) document.exitPointerLock();
   finalizeGameStats(); // Phase 4.1：局末结算，写入存档/经验/成就
@@ -1922,16 +1924,27 @@ function switchWeapon(delta) {
   cur = WORDER[i];
   reloading = false;
   fireCd = Math.max(fireCd, 0.25);
-  if (zoomed) { zoomed = false; camera.fov = 75; camera.updateProjectionMatrix(); }
+  // 切武器时清 ADS 与狙击镜，避免状态错乱
+  if (zoomed) { zoomed = false; }
+  aiming = false;
+  applyAimFov();
   updateGunModel();
   sfx.switchW();
   updateHUD();
 }
+// 统一管理 FOV：狙击镜(28) > ADS(45) > 默认(75)
+function applyAimFov() {
+  let fov = 75;
+  if (zoomed) fov = 28;            // 狙击高倍镜优先
+  else if (aiming) fov = 45;       // 右键 ADS 瞄准
+  camera.fov = fov;
+  camera.updateProjectionMatrix();
+}
 function toggleZoom() {
   if (cur !== "sniper" || state !== "playing") return;
   zoomed = !zoomed;
-  camera.fov = zoomed ? 28 : 75;
-  camera.updateProjectionMatrix();
+  if (zoomed) aiming = false;       // 进狙击镜时退出 ADS，由 zoomed 接管 FOV
+  applyAimFov();
   sfx.switchW();
 }
 
@@ -1957,7 +1970,7 @@ function shoot() {
 
   for (let p = 0; p < w.pellets; p++) {
     const dir = baseDir.clone();
-    const sp = w.spread + bloom; // 基础散布 + 动态 bloom
+    const sp = (w.spread + bloom) * (aiming ? 0.5 : 1); // 基础散布 + 动态 bloom；ADS 瞄准时减半
     if (sp > 0) {
       dir.x += (Math.random() - 0.5) * sp * 2;
       dir.y += (Math.random() - 0.5) * sp * 2;
@@ -2310,6 +2323,7 @@ document.addEventListener("keydown", e => {
   if (state !== "playing") return;
   if (e.code === "KeyR") startReload();
   if (e.code === "KeyQ") switchWeapon(1);
+  if (e.code === "KeyE") placeBlock();   // E 键放方块（原右键功能迁移）
   if (e.code === "KeyF") toggleZoom();
   if (e.code === "KeyG") throwGrenade();
   if (e.code === "KeyV") melee();
@@ -2321,7 +2335,8 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keyup", e => keys[e.code] = false);
 document.addEventListener("mousemove", e => {
   if (!locked) return;
-  const sens = (zoomed ? 0.0009 : 0.0023) * mouseSens;
+  // 灵敏度：狙击镜 > ADS > 默认
+  const sens = (zoomed ? 0.0009 : aiming ? 0.0014 : 0.0023) * mouseSens;
   yaw -= e.movementX * sens;
   pitch -= e.movementY * sens;
   pitch = Math.max(-1.55, Math.min(1.55, pitch));
@@ -2329,9 +2344,13 @@ document.addEventListener("mousemove", e => {
 document.addEventListener("mousedown", e => {
   if (!locked || state !== "playing") return;
   if (e.button === 0) { shooting = true; if (fireCd <= 0) shoot(); }
-  if (e.button === 2) placeBlock();
+  else if (e.button === 2) { aiming = true; applyAimFov(); }       // 右键 ADS 瞄准
+  else if (e.button === 1) { placeBlock(); e.preventDefault(); }   // 中键放方块
 });
-document.addEventListener("mouseup", e => { if (e.button === 0) shooting = false; });
+document.addEventListener("mouseup", e => {
+  if (e.button === 0) shooting = false;
+  else if (e.button === 2) { aiming = false; applyAimFov(); }      // 松开右键退出 ADS
+});
 document.addEventListener("wheel", e => {
   if (state === "playing" && locked) switchWeapon(e.deltaY > 0 ? 1 : -1);
 }, { passive: true });
@@ -2342,6 +2361,7 @@ document.addEventListener("pointerlockchange", () => {
   if (!locked && state === "playing") {
     state = "paused";
     shooting = false;
+    aiming = false; applyAimFov();   // 暂停时退出 ADS，避免恢复后 FOV 错乱
     pauseEl.style.display = "flex";
   } else if (locked && state === "paused") {
     state = "playing";
@@ -2370,7 +2390,7 @@ function onTouchMove(e) {
   if (lookId === null) return;
   for (const t of e.changedTouches) {
     if (t.identifier === lookId) {
-      const sens = zoomed ? 0.0018 : 0.0042;
+      const sens = zoomed ? 0.0018 : aiming ? 0.0028 : 0.0042;
       yaw -= (t.clientX - lookLX) * sens;
       pitch -= (t.clientY - lookLY) * sens;
       pitch = Math.max(-1.55, Math.min(1.55, pitch));
@@ -2475,7 +2495,9 @@ function startGame() {
   mags.sniper = WEAPONS.sniper.mag;
   wave = 0; waveState = "clear"; spawnTimer = 2.5;
   reloading = false; shooting = false; fireCd = 0; bloom = 0; gunKick = 0;
-  if (zoomed) { zoomed = false; camera.fov = 75; camera.updateProjectionMatrix(); }
+  aiming = false;
+  if (zoomed) { zoomed = false; }
+  applyAimFov();
   updateGunModel();
   pos.set(W / 2 + 0.5, surfaceY(W / 2, D / 2) + 0.1, D / 2 + 0.5);
   vel.set(0, 0, 0);
@@ -2509,9 +2531,9 @@ function showTutorial() {
       "滑动屏幕空白处转动视角"
     : "<div class='tut-title'>🎮 操作指引</div>" +
       "<b>WASD</b> 移动 · <b>Shift</b> 疾跑 · <b>空格</b> 跳跃<br>" +
-      "<b>鼠标</b> 视角 · <b>左键</b> 射击 · <b>右键</b> 放方块<br>" +
+      "<b>鼠标</b> 视角 · <b>左键</b> 射击 · <b>右键</b> 瞄准<br>" +
       "<b>R</b> 换弹 · <b>Q</b> 切武器 · <b>F</b> 狙击镜<br>" +
-      "<b>G</b> 手雷 · <b>V</b> 近战 · <b>1-6</b> 选方块";
+      "<b>G</b> 手雷 · <b>V</b> 近战 · <b>E</b> 放方块 · <b>1-6</b> 选方块";
   el.style.display = "block";
   setTimeout(() => { el.style.display = "none"; }, 6000);
 }

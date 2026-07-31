@@ -109,12 +109,12 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
 | Key | Action | Key | Action |
 |-----|--------|-----|--------|
 | W A S D | Move | Mouse | Look |
-| Left Click | Shoot (break block / detonate TNT) | Right Click | Place block |
-| Q / Wheel | Switch weapon | F | Sniper scope |
-| 1 - 6 | Select block (6 = TNT) | R | Reload |
-| Shift | Sprint | Space | Jump |
-| G | Grenade | V | Melee |
-| ESC | Pause | | |
+| Left Click | Shoot (break block / detonate TNT) | Right Click | Aim down sights (ADS, half spread) |
+| Q / Wheel | Switch weapon (pistol/rifle/shotgun/sniper/rocket) | F | Sniper scope (sniper only) |
+| E / Middle Click | Place block | 1 - 6 | Select block (6 = TNT) |
+| R | Reload | G | Grenade |
+| V | Melee | Shift | Sprint |
+| Space | Jump | ESC | Pause |
 
 ### Mobile (Touch)
 
