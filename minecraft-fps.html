@@ -127,6 +127,31 @@
   .achv .achv-name { font-weight: bold; }
   .achv .achv-desc { font-size: 11px; color: #999; }
   .achv.unlocked .achv-desc { color: #ccc; }
+  /* ===== P9.1: 本地排行榜面板 ===== */
+  #leaderboard-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; overflow: auto; }
+  #leaderboard-panel .panel { background: #2a2a2a; border: 2px solid #555; padding: 24px 32px; min-width: 420px; max-width: 560px; }
+  #leaderboard-panel h2 { color: #ffd833; margin: 0 0 12px; text-align: center; }
+  #leaderboard-panel .lb-empty { color: #888; text-align: center; padding: 30px 0; font-size: 14px; }
+  #leaderboard-panel table { width: 100%; border-collapse: collapse; color: #ddd; font-size: 13px; }
+  #leaderboard-panel th { color: #999; padding: 6px 4px; border-bottom: 1px solid #444; font-weight: normal; text-align: center; }
+  #leaderboard-panel td { padding: 7px 4px; border-bottom: 1px solid #333; text-align: center; }
+  #leaderboard-panel tr.lb-self { background: rgba(255,216,51,0.12); }
+  #leaderboard-panel tr.lb-self td { color: #ffd833; font-weight: bold; }
+  #leaderboard-panel .lb-rank { width: 36px; color: #999; }
+  #leaderboard-panel tr.lb-self .lb-rank { color: #ffd833; }
+  #leaderboard-panel .lb-rank-1 { color: #ffd833 !important; font-weight: bold; }
+  #leaderboard-panel .lb-rank-2 { color: #c0c0c0 !important; font-weight: bold; }
+  #leaderboard-panel .lb-rank-3 { color: #cd7f32 !important; font-weight: bold; }
+  #leaderboard-panel .lb-score { color: #9fd66b; font-weight: bold; }
+  #leaderboard-panel .lb-hint { color: #666; font-size: 11px; text-align: center; margin-top: 8px; }
+  /* ===== P9.2: 受击方向指示器 ===== */
+  #hit-dir-container { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 40; }
+  .hit-dir { position: absolute; left: -14px; top: -110px; width: 28px; height: 18px; background: rgba(255,40,40,0.85); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); transform-origin: 14px 128px; opacity: 0; animation: hitDirFade 1s ease-out forwards; filter: drop-shadow(0 0 4px rgba(255,0,0,0.8)); }
+  @keyframes hitDirFade { 0% { opacity: 0.95; } 70% { opacity: 0.6; } 100% { opacity: 0; } }
+  /* ===== P9.2: 低弹量警告 ===== */
+  #ammo.low-ammo { color: #ff5533 !important; animation: lowAmmoBlink 0.8s ease-in-out infinite; }
+  @keyframes lowAmmoBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  #grenade.grenade-empty { color: #ff5533 !important; animation: lowAmmoBlink 0.8s ease-in-out infinite; }
   #achv-toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); border: 2px solid #ffd833; color: #fff; padding: 12px 24px; font-size: 16px; display: none; z-index: 50; text-align: center; }
   #achv-toast .achv-t-name { color: #ffd833; font-weight: bold; }
   #level-bar { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); width: 220px; text-align: center; color: #fff; text-shadow: 1px 1px 0 #000; font-size: 12px; }
@@ -204,6 +229,7 @@
   </div>
 </div>
 <div id="hurt"></div>
+<div id="hit-dir-container"></div>
 <div id="tutorial"></div>
 
 <div id="touch-ui">
@@ -224,8 +250,8 @@
 </div>
 
 <div id="menu" class="overlay">
-  <h1>方块枪战 <span style="font-size:22px;color:#9fd66b;">v4</span></h1>
-  <h2>— 我的世界风格 方块 FPS · 支持电脑 + 手机 —</h2>
+  <h1><span data-i18n="menu.title">方块枪战</span> <span style="font-size:22px;color:#9fd66b;">v4</span></h1>
+  <h2 data-i18n="menu.subtitle">— 我的世界风格 方块 FPS · 支持电脑 + 手机 —</h2>
   <div class="panel" id="controls-pc">
     <table>
       <tr><td class="k">W A S D</td><td>移动</td><td class="k">鼠标</td><td>视角</td></tr>
@@ -251,12 +277,15 @@
       <tr><td class="k">⏸</td><td>左上角暂停</td></tr>
     </table>
   </div>
-  <button class="mc-btn small" id="touchToggle">📱 触屏按键模式</button>
+  <button class="mc-btn small" id="touchToggle" data-i18n="menu.touchMode">📱 触屏按键模式</button>
   <button class="mc-btn small" id="qualityBtn">🎨 画质：中</button>
-  <button class="mc-btn small" id="settingsBtn">⚙ 设置</button>
-  <button class="mc-btn small" id="progressBtn">📊 进度</button>
-  <button class="mc-btn small" id="upgradeBtn">⬆ 升级</button>
-  <button class="mc-btn" id="startBtn">开始游戏</button>
+  <button class="mc-btn small" id="padToggle" data-i18n="menu.padOff">🎮 手柄：关</button>
+  <button class="mc-btn small" id="settingsBtn" data-i18n="menu.settings">⚙ 设置</button>
+  <button class="mc-btn small" id="progressBtn" data-i18n="menu.progress">📊 进度</button>
+  <button class="mc-btn small" id="upgradeBtn" data-i18n="menu.upgrade">⬆ 升级</button>
+  <button class="mc-btn small" id="leaderboardBtn" data-i18n="menu.leaderboard">🏆 排行榜</button>
+  <button class="mc-btn small" id="langBtn">🌐 中文</button>
+  <button class="mc-btn" id="startBtn" data-i18n="menu.start">开始游戏</button>
   <div class="tip">
     ⚠ 苦力怕靠近你会自爆，优先点杀！· TNT 可连锁引爆，炸丧尸效率一流<br>
     爆头双倍伤害 · 夜晚丧尸更狂暴 · 击杀掉落红心/弹药补给 · 清空一波回 25 血
@@ -264,15 +293,16 @@
 </div>
 
 <div id="pause" class="overlay">
-  <h1>已暂停</h1>
-  <button class="mc-btn" id="resumeBtn">继续游戏</button>
-  <button class="mc-btn small" id="pauseSettingsBtn">⚙ 设置</button>
-  <button class="mc-btn small" id="pauseUpgradeBtn">⬆ 升级</button>
-  <button class="mc-btn small" id="pauseProgressBtn">📊 进度</button>
+  <h1 data-i18n="pause.title">已暂停</h1>
+  <button class="mc-btn" id="resumeBtn" data-i18n="pause.resume">继续游戏</button>
+  <button class="mc-btn small" id="pauseSettingsBtn" data-i18n="menu.settings">⚙ 设置</button>
+  <button class="mc-btn small" id="pauseUpgradeBtn" data-i18n="menu.upgrade">⬆ 升级</button>
+  <button class="mc-btn small" id="pauseProgressBtn" data-i18n="menu.progress">📊 进度</button>
+  <button class="mc-btn small" id="pauseLeaderboardBtn" data-i18n="menu.leaderboard">🏆 排行榜</button>
 </div>
 
 <div id="gameover" class="overlay">
-  <h1 style="text-shadow: 4px 4px 0 #6e1a1a;">游戏结束</h1>
+  <h1 style="text-shadow: 4px 4px 0 #6e1a1a;" data-i18n="over.title">游戏结束</h1>
   <div id="final-stats"></div>
   <div id="stats-board">
     <table>
@@ -286,14 +316,15 @@
       <tr><td>最高连杀</td><td><b id="sb-streak">0</b></td></tr>
     </table>
   </div>
-  <button class="mc-btn" id="retryBtn">重新开始</button>
-  <button class="mc-btn small" id="go-upgradeBtn">⬆ 升级技能点</button>
-  <button class="mc-btn small" id="go-progressBtn">📊 查看进度</button>
+  <button class="mc-btn" id="retryBtn" data-i18n="over.retry">重新开始</button>
+  <button class="mc-btn small" id="go-upgradeBtn" data-i18n="over.upgrade">⬆ 升级技能点</button>
+  <button class="mc-btn small" id="go-progressBtn" data-i18n="over.progress">📊 查看进度</button>
+  <button class="mc-btn small" id="go-leaderboardBtn" data-i18n="over.leaderboard">🏆 排行榜</button>
 </div>
 
 <div id="settings-panel">
   <div class="panel">
-    <h2>⚙ 设置</h2>
+    <h2 data-i18n="panel.settings">⚙ 设置</h2>
     <div class="row"><span>画质</span>
       <select id="set-quality">
         <option value="low">低</option>
@@ -313,13 +344,13 @@
     <div class="row"><span>🌧 天气效果</span><input type="checkbox" id="set-weather"></div>
     <div class="row"><span>🧱 程序化纹理</span><input type="checkbox" id="set-texture"></div>
     <div class="row"><span>✨ 后处理泛光（高画质）</span><input type="checkbox" id="set-bloom"></div>
-    <button class="mc-btn small" id="set-close" style="margin-top:16px;">关闭</button>
+    <button class="mc-btn small" id="set-close" style="margin-top:16px;" data-i18n="panel.close">关闭</button>
   </div>
 </div>
 
 <div id="progress-panel">
   <div class="panel">
-    <h2>📊 游戏进度</h2>
+    <h2 data-i18n="panel.progress">📊 游戏进度</h2>
     <div class="stat-row"><span>最高得分</span><b id="pp-score">0</b></div>
     <div class="stat-row"><span>最高波次</span><b id="pp-wave">0</b></div>
     <div class="stat-row"><span>总击杀数</span><b id="pp-kills">0</b></div>
@@ -329,24 +360,33 @@
     <div class="stat-row"><span>已解锁成就</span><b id="pp-achv">0 / 0</b></div>
     <h2 style="margin-top:16px;">🏆 成就</h2>
     <div class="achv-grid" id="achv-grid"></div>
-    <button class="mc-btn small" id="pp-close" style="margin-top:16px;">关闭</button>
+    <button class="mc-btn small" id="pp-close" style="margin-top:16px;" data-i18n="panel.close">关闭</button>
+  </div>
+</div>
+
+<div id="leaderboard-panel">
+  <div class="panel">
+    <h2 data-i18n="panel.leaderboard">🏆 本地排行榜 Top 10</h2>
+    <div id="lb-body"></div>
+    <div class="lb-hint">按得分降序，仅保留前 10 名（本地存储）</div>
+    <button class="mc-btn small" id="lb-close" style="margin-top:16px;" data-i18n="panel.close">关闭</button>
   </div>
 </div>
 
 <div id="upgrade-panel">
   <div class="panel">
-    <h2>⬆ 升级 (剩余点数: <span class="pts" id="up-pts">0</span>)</h2>
+    <h2><span data-i18n="panel.upgrade">⬆ 升级</span> (剩余点数: <span class="pts" id="up-pts">0</span>)</h2>
     <div class="up-row"><span>伤害强化 (<b id="up-dmg-lv">0</b>/5) +10%每级</span><button id="up-dmg">+</button></div>
     <div class="up-row"><span>最大生命 (<b id="up-hp-lv">0</b>/5) +15每级</span><button id="up-hp">+</button></div>
     <div class="up-row"><span>换弹速度 (<b id="up-reload-lv">0</b>/5) -10%每级</span><button id="up-reload">+</button></div>
     <div class="up-row"><span>移动速度 (<b id="up-speed-lv">0</b>/5) +8%每级</span><button id="up-speed">+</button></div>
-    <button class="mc-btn small" id="up-close" style="margin-top:16px;">关闭</button>
+    <button class="mc-btn small" id="up-close" style="margin-top:16px;" data-i18n="panel.close">关闭</button>
   </div>
 </div>
 
 <div id="reward-panel">
   <div class="panel">
-    <h2>✦ 通关奖励 ✦</h2>
+    <h2 data-i18n="panel.reward">✦ 通关奖励 ✦</h2>
     <div class="rw-sub">选择一项强化（本局永久生效，可累积）</div>
     <div class="reward-cards">
       <div class="reward-card" id="rw-heal">
@@ -1242,7 +1282,7 @@ function explode(x, y, z, r, maxDmg) {
     if (cx >= 0 && cx < W / CHUNK && cz >= 0 && cz < D / CHUNK) buildChunk(cx, cz);
   }
   const pd = Math.hypot(pos.x - x, pos.y + 1 - y, pos.z - z);
-  if (pd < r * 1.4) damagePlayer(Math.round(maxDmg * (1 - pd / (r * 1.4))));
+  if (pd < r * 1.4) damagePlayer(Math.round(maxDmg * (1 - pd / (r * 1.4))), x, z); // P9.2：传入爆炸中心坐标
   for (const m of mobs) {
     const mp = m.g.position;
     const md = Math.hypot(mp.x - x, mp.y + 1 - y, mp.z - z);
@@ -1862,7 +1902,7 @@ function updateMobs(dt) {
         // 简易命中：距离越近命中率越高，70% 上限
         const hitChance = Math.min(0.7, 0.3 + (14 - dist) / 14 * 0.4);
         if (Math.random() < hitChance) {
-          damagePlayer(12);
+          damagePlayer(12, p.x, p.z); // P9.2：传入骷髅位置
           sfx.hurt();
         } else {
           sfx.shoot("pistol"); // 箭矢飞行声近似
@@ -1876,7 +1916,7 @@ function updateMobs(dt) {
       m.jumpCd -= dt;
       if (m.state === "attack" && dist < 1.4 && m.atkCd <= 0) {
         m.atkCd = 0.8; // 攻速快
-        damagePlayer(6);
+        damagePlayer(6, p.x, p.z); // P9.2：传入蜘蛛位置
       }
       // 距离 4-8 且跳跃冷却结束：向前突进
       if (m.state === "chase" && dist > 4 && dist < 8 && m.jumpCd <= 0) {
@@ -1900,7 +1940,7 @@ function updateMobs(dt) {
       // 近身攻击（所有阶段）
       if (m.state === "attack" && dist < 3.5 && m.atkCd <= 0) {
         m.atkCd = m.phase === 3 ? 0.8 : 1.5;  // 阶段3 攻速翻倍
-        damagePlayer(m.phase === 3 ? 25 : 18);
+        damagePlayer(m.phase === 3 ? 25 : 18, p.x, p.z); // P9.2：传入Boss位置
       }
       // 阶段1：周期召唤 2 只小怪
       m.summonCd -= dt;
@@ -1916,7 +1956,7 @@ function updateMobs(dt) {
       m.slamCd -= dt;
       if (m.phase === 2 && m.slamCd <= 0 && dist < 8) {
         m.slamCd = 5;
-        if (dist < 5) { damagePlayer(15); shakeT = Math.max(shakeT, 0.5); }
+        if (dist < 5) { damagePlayer(15, p.x, p.z); shakeT = Math.max(shakeT, 0.5); } // P9.2：传入Boss位置
         spawnParticles(p.x, p.y + 0.3, p.z, 0x8b4513, 20, 5);
         sfx.explode();
       }
@@ -1926,7 +1966,7 @@ function updateMobs(dt) {
         m.fireballCd = 3.5;
         const hitChance = Math.min(0.6, 0.3 + (20 - dist) / 20 * 0.3);
         if (Math.random() < hitChance) {
-          damagePlayer(20);
+          damagePlayer(20, p.x, p.z); // P9.2：传入Boss位置
           sfx.hurt();
         }
         addTracer(new THREE.Vector3(p.x, p.y + 3, p.z), new THREE.Vector3(pos.x, pos.y + 1.2, pos.z));
@@ -1936,7 +1976,7 @@ function updateMobs(dt) {
       m.atkCd -= dt;
       if (m.state === "attack" && dist < 1.35 && m.atkCd <= 0) {
         m.atkCd = 1;
-        damagePlayer(8);
+        damagePlayer(8, p.x, p.z); // P9.2：传入敌人位置
       }
     }
     if (m.fuse <= 0) {
@@ -2061,6 +2101,87 @@ let yaw = 0, pitch = 0, onGround = false;
 const keys = {};
 // 触屏方向键状态（按住 = true）
 const dpad = { up: false, down: false, left: false, right: false, sprint: false };
+// P9.5：手柄输入状态——左摇杆 ix/iy，右摇杆 rx/ry，按钮 edge 上升沿标记
+const pad = { enabled: false, ix: 0, iz: 0, rx: 0, ry: 0, jumpEdge: false, reloadEdge: false, switchEdge: false, meleeEdge: false, grenadeEdge: false, pauseEdge: false };
+let padPrev = {}; // 上一帧按钮状态，用于边沿检测
+// P9.5：轮询手柄状态，标准 FPS 映射
+function pollGamepad() {
+  pad.jumpEdge = pad.reloadEdge = pad.switchEdge = pad.meleeEdge = pad.grenadeEdge = pad.pauseEdge = false;
+  if (!pad.enabled) { pad.ix = pad.iz = pad.rx = pad.ry = 0; return; }
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let gp = null;
+  for (let i = 0; i < pads.length; i++) { if (pads[i]) { gp = pads[i]; break; } }
+  if (!gp) { pad.ix = pad.iz = pad.rx = pad.ry = 0; return; }
+  // 左摇杆：移动（死区 0.15）
+  const lx = gp.axes[0] || 0, ly = gp.axes[1] || 0;
+  const dead = 0.15;
+  pad.ix = Math.abs(lx) < dead ? 0 : lx;
+  pad.iz = Math.abs(ly) < dead ? 0 : -ly; // 摇杆前推 = 向前（iz+）
+  // 右摇杆：视角（死区 0.12）
+  const rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
+  pad.rx = Math.abs(rx) < 0.12 ? 0 : rx;
+  pad.ry = Math.abs(ry) < 0.12 ? 0 : ry;
+  // 标准映射按钮（standard mapping）
+  const b = gp.buttons;
+  const cur = {
+    a: b[0] && b[0].pressed,   // A = 跳跃
+    b: b[1] && b[1].pressed,   // B = 暂停（边沿）
+    x: b[2] && b[2].pressed,   // X = 换弹（边沿）
+    y: b[3] && b[3].pressed,   // Y = 近战（边沿）
+    lb: b[4] && b[4].pressed,  // LB = 上一把武器（边沿）
+    rb: b[5] && b[5].pressed,  // RB = 下一把武器（边沿）
+    lt: b[6] && b[6].pressed,  // LT = 瞄准（保持）
+    rt: b[7] && b[7].pressed,  // RT = 射击（保持）
+    back: b[8] && b[8].pressed,// Back = 切武器（边沿）
+    start: b[9] && b[9].pressed, // Start = 暂停（边沿）
+    ls: b[10] && b[10].pressed, // L3 = 手雷（边沿）
+    rs: b[11] && b[11].pressed, // R3 = 建造方块（边沿）
+    up: b[12] && b[12].pressed,
+    down: b[13] && b[13].pressed,
+    left: b[14] && b[14].pressed,
+    right: b[15] && b[15].pressed,
+  };
+  // 上升沿检测
+  if (cur.a && !padPrev.a) pad.jumpEdge = true;
+  if (cur.x && !padPrev.x) pad.reloadEdge = true;
+  if ((cur.rb || cur.lb || cur.back) && !padPrev.rb && !padPrev.lb && !padPrev.back) pad.switchEdge = true;
+  if (cur.y && !padPrev.y) pad.meleeEdge = true;
+  if (cur.ls && !padPrev.ls) pad.grenadeEdge = true;
+  if ((cur.b || cur.start) && !padPrev.b && !padPrev.start) pad.pauseEdge = true;
+  padPrev = cur;
+  // 跳跃直接映射到 keys.Space（保持兼容现有逻辑）
+  if (cur.a) keys["Space"] = true; else if (!keys["Space"]) {} // 不覆盖键盘
+}
+// P9.5：处理手柄视角旋转、射击/瞄准保持、边沿动作（换弹/切武器/近战/手雷/暂停）
+function applyPadInput(dt) {
+  if (!pad.enabled) return;
+  // 右摇杆视角（与鼠标灵敏度体系一致）
+  if (pad.rx !== 0 || pad.ry !== 0) {
+    const sens = (zoomed ? 0.045 : aiming ? 0.06 : 0.09) * mouseSens;
+    yaw -= pad.rx * sens;
+    pitch -= pad.ry * sens;
+    pitch = Math.max(-1.55, Math.min(1.55, pitch));
+  }
+  // RT 射击（保持）——仅在指针锁定或触屏模式下生效
+  const gp = navigator.getGamepads ? navigator.getGamepads() : [];
+  let cur = null;
+  for (let i = 0; i < gp.length; i++) { if (gp[i]) { cur = gp[i]; break; } }
+  if (cur) {
+    const rt = cur.buttons[7] && cur.buttons[7].pressed;
+    const lt = cur.buttons[6] && cur.buttons[6].pressed;
+    if (rt && !shooting && fireCd <= 0) { shooting = true; shoot(); }
+    else if (!rt) shooting = false;
+    // LT 瞄准（保持）
+    if (lt && !aiming) { aiming = true; applyAimFov(); }
+    else if (!lt && aiming) { aiming = false; applyAimFov(); }
+  }
+  // 边沿动作
+  if (pad.reloadEdge) startReload();
+  if (pad.switchEdge) switchWeapon(1);
+  if (pad.meleeEdge) melee();
+  if (pad.grenadeEdge) throwGrenade();
+  if (pad.pauseEdge) { if (state === "playing") togglePause(); }
+}
 function clearTouchInput() {
   dpad.up = dpad.down = dpad.left = dpad.right = false;
   shooting = false;
@@ -2153,16 +2274,66 @@ const defaultSave = {
   achievements: {}, // id -> true
   level: 1, xp: 0, skillPoints: 0,
   upgrades: { dmg: 0, hp: 0, reload: 0, speed: 0 },
+  leaderboard: [], // P9.1：本地排行榜 Top 10，每条 { score, wave, kills, level, date }
+  padEnabled: false, // P9.5：手柄开关（持久化）
+  lang: "zh",        // P9.4：语言（zh/en，持久化）
 };
 let save = loadSave();
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s) return Object.assign({}, defaultSave, s, { achievements: s.achievements || {}, upgrades: Object.assign({}, defaultSave.upgrades, s.upgrades || {}) });
+    if (s) return Object.assign({}, defaultSave, s, {
+      achievements: s.achievements || {},
+      upgrades: Object.assign({}, defaultSave.upgrades, s.upgrades || {}),
+      leaderboard: Array.isArray(s.leaderboard) ? s.leaderboard : [], // P9.1：兼容旧存档
+      padEnabled: typeof s.padEnabled === "boolean" ? s.padEnabled : false, // P9.5
+      lang: s.lang === "en" ? "en" : "zh", // P9.4
+    });
   } catch (e) {}
   return Object.assign({}, defaultSave);
 }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+// ---------------- P9.4: 轻量 i18n（中/英）----------------
+// 策略：关键静态 UI 节点加 data-i18n="key"，切换时遍历替换 textContent；动态文本不翻译
+const I18N = {
+  zh: {
+    // 菜单
+    "menu.title": "方块枪战", "menu.subtitle": "— 我的世界风格 方块 FPS · 支持电脑 + 手机 —",
+    "menu.start": "开始游戏", "menu.settings": "⚙ 设置", "menu.progress": "📊 进度",
+    "menu.upgrade": "⬆ 升级", "menu.leaderboard": "🏆 排行榜", "menu.touchMode": "📱 触屏按键模式",
+    "menu.padOff": "🎮 手柄：关", "menu.padOn": "🎮 手柄：开",
+    // 暂停
+    "pause.title": "已暂停", "pause.resume": "继续游戏",
+    // 游戏结束
+    "over.title": "游戏结束", "over.retry": "重新开始", "over.upgrade": "⬆ 升级技能点",
+    "over.progress": "📊 查看进度", "over.leaderboard": "🏆 排行榜",
+    // 面板标题
+    "panel.settings": "⚙ 设置", "panel.progress": "📊 游戏进度", "panel.leaderboard": "🏆 本地排行榜 Top 10",
+    "panel.upgrade": "⬆ 升级", "panel.reward": "✦ 通关奖励 ✦", "panel.close": "关闭",
+    // 通用
+    "common.day": "☀ 白天", "common.night": "🌙 夜晚", "common.score": "得分", "common.kills": "击杀",
+    "common.wave": "波次", "common.level": "关卡", "common.enemies": "剩余敌人",
+  },
+  en: {
+    "menu.title": "Block FPS", "menu.subtitle": "— Minecraft-style Voxel FPS · PC + Mobile —",
+    "menu.start": "Start Game", "menu.settings": "⚙ Settings", "menu.progress": "📊 Progress",
+    "menu.upgrade": "⬆ Upgrade", "menu.leaderboard": "🏆 Leaderboard", "menu.touchMode": "📱 Touch Mode",
+    "menu.padOff": "🎮 Pad: Off", "menu.padOn": "🎮 Pad: On",
+    "pause.title": "Paused", "pause.resume": "Resume",
+    "over.title": "Game Over", "over.retry": "Retry", "over.upgrade": "⬆ Upgrade Skills",
+    "over.progress": "📊 View Progress", "over.leaderboard": "🏆 Leaderboard",
+    "panel.settings": "⚙ Settings", "panel.progress": "📊 Game Progress", "panel.leaderboard": "🏆 Local Top 10",
+    "panel.upgrade": "⬆ Upgrade", "panel.reward": "✦ Clear Reward ✦", "panel.close": "Close",
+    "common.day": "☀ Day", "common.night": "🌙 Night", "common.score": "Score", "common.kills": "Kills",
+    "common.wave": "Wave", "common.level": "Level", "common.enemies": "Enemies",
+  },
+};
+let curLang = "zh";
+function t(key) { return (I18N[curLang] && I18N[curLang][key]) || (I18N.zh[key]) || key; }
+// 遍历所有 [data-i18n] 节点，按当前语言刷新文本
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.getAttribute("data-i18n")); });
+}
 
 // 成就定义：id -> { name, desc, check(save, ctx) }
 const ACHIEVEMENTS = [
@@ -2239,6 +2410,7 @@ maxHp = upStats.maxHp; // 同步初始化（读取已有存档的 HP 升级）
 function refreshUpStats() { upStats = getUpgradedStats(); maxHp = upStats.maxHp; }
 
 // 局末结算：更新存档
+let lastRunId = 0; // P9.1：本局记录的唯一 id（用于排行榜高亮）
 function finalizeGameStats() {
   save.totalGames++;
   save.totalKills += kills;
@@ -2246,6 +2418,18 @@ function finalizeGameStats() {
   if (score > save.bestScore) save.bestScore = score;
   if (wave > save.bestWave) save.bestWave = wave;
   if (killStats.streak > save.bestStreak) save.bestStreak = killStats.streak;
+  // P9.1：插入排行榜——记录本局成绩，按 score 降序保留 Top 10
+  lastRunId = Date.now();
+  save.leaderboard.push({
+    id: lastRunId,
+    score: score,
+    wave: wave,
+    kills: kills,
+    level: level,
+    date: new Date().toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+  });
+  save.leaderboard.sort((a, b) => b.score - a.score);
+  if (save.leaderboard.length > 10) save.leaderboard.length = 10;
   // XP：每击杀 10xp，每波 20xp
   gainXP(kills * 10 + wave * 20);
   checkAchievements();
@@ -2307,9 +2491,18 @@ function updateHUD() {
   $("health-fill").style.width = Math.max(0, Math.min(100, health / maxHp * 100)) + "%";
   $("weapon").textContent = WEAPONS[cur].name + (cur === "sniper" ? (touchMode ? "（镜 狙击）" : "（F 狙击镜）") : "");
   if (reloading) { ammoEl.textContent = "装填中…"; ammoEl.className = "reloading"; }
-  else { ammoEl.innerHTML = mags[cur] + " <small>/ ∞</small>"; ammoEl.className = ""; }
+  else {
+    ammoEl.innerHTML = mags[cur] + " <small>/ ∞</small>";
+    // P9.2：低弹量警告——当前弹匣 ≤ 总容量 25% 且非空时红色闪烁
+    const mag = WEAPONS[cur].mag;
+    ammoEl.className = (mags[cur] > 0 && mags[cur] <= Math.ceil(mag * 0.25)) ? "low-ammo" : "";
+  }
   const ge = $("grenade");
-  if (ge) ge.textContent = "💣 " + grenadeAmmo;
+  if (ge) {
+    ge.textContent = "💣 " + grenadeAmmo;
+    // P9.2：手雷耗尽时红色闪烁提示
+    ge.className = grenadeAmmo <= 0 ? "grenade-empty" : "";
+  }
   // P6.3：Boss 血条更新——存活时显示，死亡后隐藏
   const boss = mobs.find(m => m.isBoss);
   const bossBar = $("boss-bar");
@@ -2360,7 +2553,9 @@ function selectSlot(i) {
 }
 
 // ---------------- 玩家伤害 / 死亡 ----------------
-function damagePlayer(d) {
+// P9.2：damagePlayer 增加可选来源坐标 srcX/srcZ，用于受击方向指示器
+const hitDirContainer = $("hit-dir-container");
+function damagePlayer(d, srcX, srcZ) {
   if (state !== "playing" || d <= 0) return;
   // P6.4：护盾激活时减伤 70%
   if (SKILLS.shield.active > 0) d = Math.round(d * 0.3);
@@ -2369,11 +2564,28 @@ function damagePlayer(d) {
   hurtEl.style.opacity = 0.85;
   setTimeout(() => hurtEl.style.opacity = 0, 120);
   sfx.hurt();
+  // P9.2：受击方向指示器——根据来源坐标计算相对玩家朝向的角度
+  if (srcX !== undefined && srcZ !== undefined) {
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    const sdx = srcX - pos.x, sdz = srcZ - pos.z;
+    // angle = 0 正前方(屏幕上方)，正值右侧，负值左侧
+    const angle = Math.atan2(camDir.x * sdz - camDir.z * sdx, camDir.x * sdx + camDir.z * sdz);
+    showHitDir(angle * 180 / Math.PI);
+  }
   if (health <= 0) {
     health = 0;
     gameOver();
   }
   updateHUD();
+}
+// P9.2：在屏幕中央上方 110px 处生成红色三角指示器，按 angle(度) 旋转指向来源方向，1s 后移除
+function showHitDir(angleDeg) {
+  const el = document.createElement("div");
+  el.className = "hit-dir";
+  el.style.transform = "rotate(" + angleDeg.toFixed(1) + "deg)";
+  hitDirContainer.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1000);
 }
 function gameOver() {
   state = "over";
@@ -2582,8 +2794,10 @@ function updatePlayer(dt) {
   if (keys["KeyS"] || dpad.down) iz -= 1;
   if (keys["KeyA"] || dpad.left) ix -= 1;
   if (keys["KeyD"] || dpad.right) ix += 1;
+  // P9.5：手柄左摇杆叠加（模拟量，更细腻）
+  if (pad.enabled) { ix += pad.ix; iz += pad.iz; }
   const len = Math.hypot(ix, iz);
-  if (len > 0) { ix /= len; iz /= len; }
+  if (len > 1) { ix /= len; iz /= len; } // 归一化，防止对角加速
   const sin = Math.sin(yaw), cos = Math.cos(yaw);
   vel.x = (cos * ix - sin * iz) * speed;
   vel.z = (-sin * ix - cos * iz) * speed;
@@ -2740,7 +2954,10 @@ function updateDayNight(dt) {
     }
     if (f < 0.5) nightAnnounced = false;
     const dn = $("daynight");
-    const label = f > 0.99 ? "🌙 夜晚" : (f > 0.01 ? "🌆 黄昏" : "☀ 白天");
+    // P9.4：昼夜标签 i18n（黄昏无翻译 key，保留 emoji + 简短中文/英文）
+    const dayL = t("common.day"), nightL = t("common.night");
+    const duskL = curLang === "en" ? "🌆 Dusk" : "🌆 黄昏";
+    const label = f > 0.99 ? nightL : (f > 0.01 ? duskL : dayL);
     if (dn.textContent !== label) dn.textContent = label;
   }
 }
@@ -3013,6 +3230,9 @@ function startGame() {
   runBuffs = { dmg: 0, speed: 0, maxHp: 0 }; // P8.3：重置本局通关 buff
   rewardOpen = false; // P8.3：确保奖励面板状态重置
   if (rewardPanel) rewardPanel.style.display = "none";
+  lastRunId = 0; // P9.1：重置本局标记，新游戏后从菜单看排行榜不高亮
+  // P9.2：清理残留的受击方向指示器
+  if (hitDirContainer) hitDirContainer.innerHTML = "";
   reloading = false; shooting = false; fireCd = 0; bloom = 0; gunKick = 0;
   aiming = false;
   if (zoomed) { zoomed = false; }
@@ -3099,6 +3319,40 @@ $("qualityBtn").addEventListener("click", () => {
   const idx = QUALITY_ORDER.indexOf(qualityKey);
   applyQuality(QUALITY_ORDER[(idx + 1) % QUALITY_ORDER.length]);
   updateQualityBtn();
+});
+// P9.5：手柄开关——切换 pad.enabled 并持久化
+function updatePadToggleBtn() {
+  const b = $("padToggle");
+  if (b) { b.textContent = t("menu.padOff").split(":")[0] + "：" + (pad.enabled ? (curLang === "en" ? "On" : "开") : (curLang === "en" ? "Off" : "关")); b.setAttribute("data-i18n", pad.enabled ? "menu.padOn" : "menu.padOff"); }
+}
+pad.enabled = save.padEnabled; // 从存档恢复
+updatePadToggleBtn();
+$("padToggle").addEventListener("click", () => {
+  pad.enabled = !pad.enabled;
+  save.padEnabled = pad.enabled;
+  writeSave();
+  updatePadToggleBtn();
+  if (pad.enabled) {
+    banner("🎮 手柄已启用——连接手柄后按任意键激活，A=跳/X=换弹/Y=近战/RT=射击/LT=瞄准/RB=切武器/L3=手雷/Start=暂停");
+  } else {
+    banner("🎮 手柄已关闭");
+  }
+});
+// P9.4：语言切换——中/英互切，持久化到 save.lang
+curLang = save.lang;
+function updateLangBtn() {
+  const b = $("langBtn");
+  if (b) b.textContent = curLang === "zh" ? "🌐 中文" : "🌐 English";
+}
+updateLangBtn();
+applyI18n(); // 启动时应用存档语言
+$("langBtn").addEventListener("click", () => {
+  curLang = curLang === "zh" ? "en" : "zh";
+  save.lang = curLang;
+  writeSave();
+  applyI18n();
+  updateLangBtn();
+  updatePadToggleBtn();
 });
 // 设置面板：开关 + 画质/音量/灵敏度绑定（P5.2 扩展）
 const settingsPanel = $("settings-panel");
@@ -3243,6 +3497,35 @@ function openProgress() { fillProgressPanel(); progressPanel.style.display = "fl
 function closeProgress() { progressPanel.style.display = "none"; }
 function openUpgrade() { fillUpgradePanel(); upgradePanel.style.display = "flex"; }
 function closeUpgrade() { upgradePanel.style.display = "none"; }
+// P9.1：本地排行榜面板
+const leaderboardPanel = $("leaderboard-panel");
+function fillLeaderboardPanel() {
+  const body = $("lb-body");
+  if (!save.leaderboard || save.leaderboard.length === 0) {
+    body.innerHTML = "<div class='lb-empty'>暂无记录，开始游戏创造你的第一个成绩吧！</div>";
+    return;
+  }
+  let html = "<table><thead><tr>" +
+    "<th class='lb-rank'>#</th><th>得分</th><th>波次</th><th>击杀</th><th>关卡</th><th>日期</th>" +
+    "</tr></thead><tbody>";
+  save.leaderboard.forEach((r, i) => {
+    const isSelf = r.id === lastRunId;
+    const rankCls = i < 3 ? " lb-rank-" + (i + 1) : "";
+    const rowCls = isSelf ? " class='lb-self'" : "";
+    html += "<tr" + rowCls + ">" +
+      "<td class='lb-rank" + rankCls + "'>" + (i + 1) + "</td>" +
+      "<td class='lb-score'>" + r.score + "</td>" +
+      "<td>" + r.wave + "</td>" +
+      "<td>" + r.kills + "</td>" +
+      "<td>" + (r.level || 1) + "</td>" +
+      "<td>" + (r.date || "-") + "</td>" +
+      "</tr>";
+  });
+  html += "</tbody></table>";
+  body.innerHTML = html;
+}
+function openLeaderboard() { fillLeaderboardPanel(); leaderboardPanel.style.display = "flex"; }
+function closeLeaderboard() { leaderboardPanel.style.display = "none"; }
 // 升级按钮：消耗 1 技能点 +1 等级，立即刷新属性并持久化
 function doUpgrade(key) {
   const d = UPGRADE_DEFS.find(x => x.key === key);
@@ -3268,6 +3551,11 @@ $("go-progressBtn").addEventListener("click", openProgress);
 // 暂停界面同样提供入口
 $("pauseUpgradeBtn").addEventListener("click", openUpgrade);
 $("pauseProgressBtn").addEventListener("click", openProgress);
+// P9.1：排行榜按钮绑定（菜单 / 游戏结束 / 暂停界面入口 + 关闭按钮）
+$("leaderboardBtn").addEventListener("click", openLeaderboard);
+$("go-leaderboardBtn").addEventListener("click", openLeaderboard);
+$("pauseLeaderboardBtn").addEventListener("click", openLeaderboard);
+$("lb-close").addEventListener("click", closeLeaderboard);
 
 // ---------------- P8.3：通关奖励系统 ----------------
 const rewardPanel = $("reward-panel");
@@ -3342,6 +3630,8 @@ function loop() {
   updateWeather(dt); // P5.3：天气粒子更新（内部判断开关与状态）
   if (boomLight.intensity > 0) boomLight.intensity = Math.max(0, boomLight.intensity - dt * 8);
   if (state === "playing") {
+    pollGamepad(); // P9.5：轮询手柄状态
+    applyPadInput(dt); // P9.5：处理手柄视角/射击/边沿动作
     updatePlayer(dt);
     updateSkills(dt); // P6.4：技能冷却递减
     // P6.4：时停期间敌人/手雷/掉落物按 timeScale 慢速更新；玩家与粒子不受影响
