@@ -20,6 +20,17 @@
 
 ---
 
+## 🚀 立即游玩
+
+任选一个链接，浏览器打开即可：
+
+| 平台 | 链接 | 特点 |
+|------|------|------|
+| GitHub Pages | https://xyy277.github.io/fps-world/minecraft-fps.html | 与代码仓库同步，推送即更新 |
+| Cloudflare Pages | https://fps-world.pages.dev/minecraft-fps.html | 全球 CDN 加速，访问更快 |
+
+---
+
 ## 📸 游戏截图
 
 <div align="center">
@@ -161,15 +172,6 @@
 | R3 | 放置方块 | Start | 菜单 |
 
 > 菜单可开关手柄（持久化到 save.padEnabled）。摇杆支持模拟量平滑移动与视角。
-
-## 🚀 立即游玩
-
-任选一个链接，浏览器打开即可：
-
-| 平台 | 链接 | 特点 |
-|------|------|------|
-| GitHub Pages | https://xyy277.github.io/fps-world/minecraft-fps.html | 与代码仓库同步，推送即更新 |
-| Cloudflare Pages | https://fps-world.pages.dev/minecraft-fps.html | 全球 CDN 加速，访问更快 |
 
 ## 💻 本地运行
 
