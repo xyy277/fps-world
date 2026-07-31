@@ -10,7 +10,7 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
 [![View on GitHub](https://img.shields.io/badge/View-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/xyy277/fps-world)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](#-license)
 [![Single File](https://img.shields.io/badge/single%20file-HTML-22c55e?style=for-the-badge)](minecraft-fps.html)
-[![Lines of Code](https://img.shields.io/badge/lines-2600+-orange?style=for-the-badge)](minecraft-fps.html)
+[![Lines of Code](https://img.shields.io/badge/lines-3500+-orange?style=for-the-badge)](minecraft-fps.html)
 
 **👆 Click any badge above to play instantly — no download, no install, no login.**
 
@@ -62,17 +62,29 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
 - ✨ **Bloom post-processing** — ACES Filmic tone mapping on high quality for a cinematic look (toggleable)
 
 ### Combat & Weapons
-- 🔫 **Three weapons** — Rifle (auto) / Shotgun (close burst) / Sniper (high-power scope), switch via mouse wheel or keys
+- 🔫 **Five weapons** — Pistol (starter, precise) / Rifle (auto) / Shotgun (close burst) / Sniper (high-power scope) / Rocket launcher (AoE blast), switch via mouse wheel or keys
 - 💥 **Recoil & dynamic bloom** — Spread grows with sustained fire, recovers on stop; reload animation with gun dip
-- 💣 **Grenades & TNT** — Throwable grenades with parabolic physics; place TNT and chain-detonate for crowd clear
+- 💣 **Grenades & TNT** — Throwable grenades with parabolic physics (start with 3, refill on kills); place TNT and chain-detonate for crowd clear
 - 🗡 **Melee attack** — Fan-shaped hit detection with cooldown for close-quarters
 - 🎯 **Headshot = 2× damage** — Golden hitmarker on head hits, double damage
 - ❤️ **Drop system** — Enemies drop hearts (heal) and ammo, rewarding aggression
 
+### Active Skills (P6.4)
+- 💨 **Sprint** (E) — 1.5s +50% speed, 8s cooldown
+- 🛡 **Shield** (Z) — 4s 70% damage reduction, 15s cooldown
+- ⏳ **Time Slow** (X) — 3s enemy speed ×0.2 (player & particles unaffected), 25s cooldown
+
 ### Enemies & AI
 - 🧟 **Wave survival** — Zombies and Creepers attack in waves, escalating in fury; clearing a wave heals +25
+- 🏹 **4 enemy types** — Zombie / Creeper (self-destruct) / Spider (fast + leap) / Skeleton Archer (ranged, 70% hit chance), unlocked by wave
 - 🧠 **FSM enemy AI** — State machine (chase/attack/flee/wander) with A* pathfinding (10×10 grid, 500-iter cap)
 - 🛡 **Cover & prediction** — Enemies use cover and predict player movement
+- 👑 **Boss fights every 5 waves** — Zombie King with 3 phases (100%/60%/30% HP), skills: charge / summon 3 adds / AOE; boss HP scales with wave & level
+
+### Biomes & Levels (P8)
+- 🌍 **4 biomes** — Grassland / Desert / Snow / Ruins, each with unique ground blocks, decorations (trees/cacti/dead trees/pillars), sky & fog colors
+- 📈 **Level progression** — Every 5 waves = 1 level, biome rotates on level-up; enemy HP ×(1 + 0.25 × (level-1)), speed +0.15 per level, boss HP ×(1 + 0.3 × (level-1))
+- 🎁 **Clear reward** — Every 5-wave clear pops a 3-pick-1 panel (❤️ Field Medic: full heal + 25 max HP / ⚔️ Damage +8% / 💨 Speed +8%), permanent for the run
 
 ### Progression & Save (RPG-lite)
 - 💾 **Persistent save** — localStorage stores best score, best wave, total kills, total games, total headshots, best streak
@@ -83,6 +95,7 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
   - Max HP +15/lvl (replaces hardcoded 100)
   - Reload speed -10%/lvl
   - Move speed +8%/lvl
+- 🏆 **Local leaderboard** — Top 10 scores persisted to localStorage (id / score / wave / kills / level / date); top 3 highlighted gold/silver/bronze, current run highlighted
 
 ### Audio
 - 🎵 **Procedural BGM** — Three looping tracks (menu/battle/game-over) synthesized via Oscillator+GainNode, 8-bit chiptune aesthetic
@@ -95,11 +108,15 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
 - 📋 **Killfeed** — Last 5 kills, auto-fade
 - 🗺 **Minimap** — Canvas 2D, refreshed every 3 frames, shows player view cone/enemies/drops
 - 📊 **Stats board** — End-game table with weapon distribution, headshots, best streak
+- 🩸 **Hit direction indicator** — Red arrow at screen center pointing to damage source, 1s fade (P9.2)
+- 💥 **Ammo warnings** — Magazine ≤25% or grenades empty → red flashing UI (P9.2)
 - ⚙ **Settings panel** — Quality / volume / sensitivity + 5 toggles (mute/BGM/weather/textures/bloom), all remembered
 
 ### Controls & Platforms
 - 🖥 **PC keyboard & mouse** — Full key mapping + pointer lock + mouse wheel weapon switch
 - 📱 **Mobile native touch** — Fixed D-pad + sprint toggle + swipe look + action buttons (fire/jump/place/reload/weapon/scope/grenade/melee)
+- 🎮 **Gamepad support** — Standard FPS mapping: left stick move / right stick look / RT fire / LT aim / A jump / X reload / Y melee / B pause / RB+LB switch weapon / L3 grenade / R3 build / Start menu (P9.5, toggleable)
+- 🌐 **Bilingual UI (i18n)** — Chinese / English toggle in menu, persisted to save.lang (P9.4)
 - 🎮 **First-time tutorial** — Operation hints shown on first game start (6s fade), with separate PC/touch versions
 
 ## 🎮 Controls
@@ -131,6 +148,19 @@ Supports PC keyboard/mouse + mobile touch · Built with Three.js
 | ⏸ | Pause (top-left) |
 
 > 💡 Tip: Creepers self-destruct when close — prioritize them! TNT chain detonation is a crowd-clearing ace.
+
+### Gamepad (Standard mapping, P9.5)
+
+| Input | Action | Input | Action |
+|-------|--------|-------|--------|
+| Left Stick | Move (analog, deadzone 0.15) | Right Stick | Look (analog, deadzone 0.12) |
+| RT | Fire (hold) | LT | Aim (hold) |
+| A | Jump | X | Reload |
+| Y | Melee | B | Pause |
+| RB / LB / Back | Switch weapon | L3 | Grenade |
+| R3 | Place block | Start | Menu |
+
+> Toggle gamepad in the menu (persisted to save.padEnabled). Analog sticks provide smooth movement and look.
 
 ## 🚀 Play Now
 
@@ -166,13 +196,13 @@ python -m http.server 8000
 | Save | localStorage | Versioned JSON, persistent progression |
 | Deployment | GitHub Pages + Cloudflare Pages | Static hosting, dual-deploy via GitHub Actions |
 
-**Why single-file?** — The ultimate "instant play" experience: send a link to a friend and they're playing. No install, no login, no backend. The entire game (logic + rendering + textures + audio + progression) lives in **one HTML file**, ~2600 lines.
+**Why single-file?** — The ultimate "instant play" experience: send a link to a friend and they're playing. No install, no login, no backend. The entire game (logic + rendering + textures + audio + progression) lives in **one HTML file**, ~3500 lines.
 
 ## 📂 Project Structure
 
 ```
 fps-world/
-├── minecraft-fps.html   # Game body (single file, ~2600 lines)
+├── minecraft-fps.html   # Game body (single file, ~3500 lines)
 ├── README.md            # This doc (English)
 ├── README.zh-CN.md      # Chinese README
 ├── AGENTS.md            # Multi-agent collaboration rules
@@ -199,23 +229,22 @@ Contributions welcome! Whether fixing bugs, refining gameplay, improving touch U
 
 ## 🗺 Roadmap
 
-**Completed (P0-P5)**
-- [x] Architecture & performance guards (quality presets + object pooling)
-- [x] Weapon feel (recoil + dynamic bloom + reload anim + grenades + melee)
-- [x] Enemy AI (FSM + A* pathfinding + cover & prediction)
-- [x] Combat UI (damage numbers + minimap + killfeed + stats board + settings)
-- [x] Save & progression (localStorage + 12 achievements + upgrade tree)
-- [x] Immersion (procedural BGM + weather + bloom + tutorial + 5 toggles)
+**Completed (P0-P9)**
+- [x] P0 — Architecture & performance guards (quality presets + object pooling)
+- [x] P1 — Weapon feel (recoil + dynamic bloom + reload anim + grenades + melee) + 5 weapons (pistol/rifle/shotgun/sniper/rocket)
+- [x] P2 — Enemy AI (FSM + A* pathfinding + cover & prediction) + 4 enemy types (zombie/creeper/spider/skeleton)
+- [x] P3 — Combat UI (damage numbers + minimap + killfeed + stats board + settings)
+- [x] P4 — Save & progression (localStorage + 12 achievements + upgrade tree)
+- [x] P5 — Immersion (procedural BGM + weather + bloom + tutorial + 5 toggles)
+- [x] P6 — Content expansion (Boss fights every 5 waves + active skills: sprint/shield/time slow + ADS aiming)
+- [x] P7 — Graphics enhancement (directional light + shadow + hemisphere light + biome fog + InstancedMesh grass/mountains + texture detail)
+- [x] P8 — Multi-scene levels (4 biomes + 5-wave level progression + difficulty scaling + 3-pick-1 clear reward)
+- [x] P9 — Polish (local leaderboard Top 10 + hit direction indicator + ammo warnings + bilingual i18n + gamepad support)
 
-**Planned (P6-P7)**
-- [ ] More weapons (pistol, rocket launcher)
-- [ ] More enemy types (skeleton archer, spider)
-- [ ] Boss fights
-- [ ] Active skills (sprint / shield / time slow)
-- [ ] Local leaderboard
-- [ ] PWA offline + i18n + gamepad support
-- [ ] More terrain biomes
+**Planned (P10)**
+- [ ] P10 — Multiplayer co-op PVE (local WebSocket server + Cloudflare Tunnel + host-authoritative sync + 4-player rooms)
 
+> P9.3 PWA offline is on hold: Service Worker requires a separate `.js` file, which violates the single-file constraint.
 > See [docs/](docs/) for detailed research and progress.
 
 ## 📜 License
