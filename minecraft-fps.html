@@ -133,6 +133,11 @@
   #level-bar .bar { height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #555; margin-top: 2px; }
   #level-bar .fill { height: 100%; background: linear-gradient(#9fd66b, #5a9437); transition: width .3s; }
   body.touch-mode #level-bar { bottom: 44px; width: 160px; }
+  /* P6.3：Boss 血条——顶部居中，仅 Boss 存活时显示 */
+  #boss-bar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 360px; display: none; text-align: center; color: #ffd833; text-shadow: 2px 2px 0 #000; font-size: 14px; z-index: 5; }
+  #boss-bar .bar { height: 12px; background: rgba(0,0,0,0.6); border: 2px solid #ffd833; margin-top: 4px; }
+  #boss-bar .fill { height: 100%; background: linear-gradient(#ff5555, #aa1111); transition: width .2s; }
+  body.touch-mode #boss-bar { width: 240px; font-size: 12px; top: 10px; }
   #upgrade-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; }
   #upgrade-panel .panel { background: #2a2a2a; border: 2px solid #555; padding: 24px 32px; min-width: 340px; }
   #upgrade-panel h2 { color: #fff; margin: 0 0 8px; }
@@ -172,6 +177,7 @@
   <div id="banner"></div>
   <div id="level-bar"><div id="level-text">Lv.1</div><div class="bar"><div class="fill" id="level-fill" style="width:0%"></div></div></div>
   <div id="achv-toast"></div>
+  <div id="boss-bar"><div id="boss-name">僵尸王</div><div class="bar"><div class="fill" id="boss-fill" style="width:100%"></div></div></div>
 </div>
 <div id="hurt"></div>
 <div id="tutorial"></div>
@@ -1271,8 +1277,45 @@ function buildSpiderModel(g, mats, legs) {
   const eyeR = new THREE.Mesh(eyeGeo, eyeM); eyeR.position.set(0.08, 0.5, 0.58);
   g.add(body, head, eyeL, eyeR);
 }
+// P6.3：Boss 模型——巨型僵尸王，体型是普通僵尸 2.5 倍，头顶皇冠，红眼，胸前装甲
+function buildBossModel(g, mats, legs) {
+  const M = c => { const m = new THREE.MeshLambertMaterial({ color: c }); mats.push(m); return m; };
+  const skin = 0x4a7a3a, dark = 0x2a4a1a, crown = 0xffd833, armor = 0x666666, eye = 0xff3333;
+  const s = 2.5; // 整体放大倍数
+  // 双腿
+  const legGeo = new THREE.BoxGeometry(0.18 * s, 0.9 * s, 0.18 * s);
+  legGeo.translate(0, -0.45 * s, 0);
+  const legL = new THREE.Mesh(legGeo, M(dark)); legL.position.set(-0.14 * s, 0.9 * s, 0);
+  const legR = new THREE.Mesh(legGeo, M(dark)); legR.position.set(0.14 * s, 0.9 * s, 0);
+  // 躯干
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5 * s, 0.7 * s, 0.28 * s), M(skin)); body.position.y = 1.45 * s;
+  // 胸甲
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.52 * s, 0.4 * s, 0.32 * s), M(armor)); chest.position.set(0, 1.55 * s, 0);
+  // 双臂
+  const armGeo = new THREE.BoxGeometry(0.15 * s, 0.7 * s, 0.15 * s);
+  armGeo.translate(0, -0.35 * s, 0);
+  const armL = new THREE.Mesh(armGeo, M(skin)); armL.position.set(-0.34 * s, 1.75 * s, 0);
+  const armR = new THREE.Mesh(armGeo, M(skin)); armR.position.set(0.34 * s, 1.75 * s, 0);
+  // 头部
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46 * s, 0.46 * s, 0.46 * s), M(skin)); head.position.y = 2.05 * s;
+  // 红色眼睛
+  const eyeM = new THREE.MeshBasicMaterial({ color: eye });
+  const eyeGeo = new THREE.BoxGeometry(0.08 * s, 0.08 * s, 0.03 * s);
+  const eyeL = new THREE.Mesh(eyeGeo, eyeM); eyeL.position.set(-0.1 * s, 2.08 * s, 0.24 * s);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeM); eyeR.position.set(0.1 * s, 2.08 * s, 0.24 * s);
+  // 皇冠（5 个金色小方块）
+  const crownM = M(crown);
+  for (let i = -2; i <= 2; i++) {
+    const spike = new THREE.Mesh(new THREE.BoxGeometry(0.08 * s, 0.18 * s, 0.08 * s), crownM);
+    spike.position.set(i * 0.1 * s, 2.35 * s, 0);
+    g.add(spike);
+  }
+  g.add(legL, legR, body, chest, armL, armR, head, eyeL, eyeR);
+  legs.push(legL, legR);
+}
 function spawnMob(wave, forceType) {
   // P6.2：敌人类型随波次解锁——zombie(1+) / creeper(2+) / spider(3+) / skeleton(4+)
+  // P6.3：Boss 由 spawnBoss 单独生成，不走此函数
   let type;
   if (forceType) type = forceType;
   else {
@@ -1320,18 +1363,97 @@ function spawnMob(wave, forceType) {
     wanderDir: Math.random() * Math.PI * 2,
   });
 }
+// P6.3：生成 Boss——每 5 波出现一次（第5/10/15...波），多阶段 + 特殊技能
+// 阶段1（HP>60%）：缓慢追击 + 周期召唤小怪
+// 阶段2（HP 30%-60%）：移速提升 + 震地范围攻击
+// 阶段3（HP<30%）：狂暴，攻速翻倍 + 周期投掷火球
+function spawnBoss(wave) {
+  let x = 0, z = 0, tries = 0;
+  do {
+    x = 2.5 + Math.random() * (W - 5);
+    z = 2.5 + Math.random() * (D - 5);
+    tries++;
+  } while (Math.hypot(x - pos.x, z - pos.z) < 18 && tries < 20);
+
+  const g = new THREE.Group();
+  const mats = [], legs = [];
+  buildBossModel(g, mats, legs);
+  g.position.set(x, surfaceY(x, z), z);
+  scene.add(g);
+
+  const baseHp = 800 + Math.floor(wave / 5) * 400; // 每 5 波 Boss 血量递增
+  mobs.push({
+    type: "boss", g, legs, mats,
+    hp: baseHp, maxHp: baseHp,
+    headY: 4.5, height: 5.5,         // 体型放大后的头部与身高
+    speed: 1.2 + Math.random() * 0.3, // 阶段1 缓慢
+    atkCd: 0, flashT: 0, fuse: 0, t: Math.random() * 10,
+    jumpCd: 0,
+    state: "chase", path: null, pathT: 0, wanderT: 0, wanderDir: Math.random() * Math.PI * 2,
+    isBoss: true,
+    phase: 1,                         // 当前阶段 1/2/3
+    summonCd: 6,                      // 召唤冷却（阶段1）
+    slamCd: 5,                        // 震地冷却（阶段2）
+    fireballCd: 4,                    // 火球冷却（阶段3）
+  });
+  banner("⚠ Boss 出现：僵尸王 Lv." + Math.floor(wave / 5) + " ⚠");
+  sfx.wave();
+}
+// P6.3：在指定坐标生成小怪（Boss 召唤用），复用 spawnMob 的模型构建逻辑
+function spawnMobAt(type, x, z) {
+  x = Math.max(1.5, Math.min(W - 1.5, x));
+  z = Math.max(1.5, Math.min(D - 1.5, z));
+  const g = new THREE.Group();
+  const mats = [], legs = [];
+  if (type === "creeper") buildCreeperModel(g, mats, legs);
+  else if (type === "skeleton") buildSkeletonModel(g, mats, legs);
+  else if (type === "spider") buildSpiderModel(g, mats, legs);
+  else buildZombieModel(g, mats, legs);
+  g.position.set(x, surfaceY(x, z), z);
+  scene.add(g);
+  const stats = {
+    zombie:   { hp: 100, headY: 1.45, height: 1.95, speed: 1.6 },
+    creeper:  { hp: 60,  headY: 1.5,  height: 2.0,  speed: 2.0 },
+    skeleton: { hp: 55,  headY: 1.6,  height: 1.95, speed: 1.4 },
+    spider:   { hp: 40,  headY: 0.4,  height: 0.8,  speed: 3.2 },
+  }[type];
+  mobs.push({
+    type, g, legs, mats,
+    hp: stats.hp, maxHp: stats.hp,
+    headY: stats.headY, height: stats.height,
+    speed: stats.speed + Math.random() * 0.4,
+    atkCd: 0, flashT: 0, fuse: 0, t: Math.random() * 10, jumpCd: 0,
+    state: "chase", path: null, pathT: 0, wanderT: 0, wanderDir: Math.random() * Math.PI * 2,
+  });
+}
 function killMob(i) {
   const m = mobs[i];
   const p = m.g.position;
-  const c1 = m.type === "creeper" ? 0x4caf50 : 0x5da85d;
-  const c2 = m.type === "creeper" ? 0x2e7d32 : 0x2e8b2e;
-  spawnParticles(p.x, p.y + 1.2, p.z, c1, 8, 3.5);
-  spawnParticles(p.x, p.y + 0.8, p.z, c2, 8, 3);
+  // P6.3：Boss 死亡特效——大量金色 + 绿色粒子 + 回血 + 回弹奖励
+  if (m.isBoss) {
+    spawnParticles(p.x, p.y + 2.5, p.z, 0xffd833, 30, 6);
+    spawnParticles(p.x, p.y + 1.5, p.z, 0x9fd66b, 30, 5);
+    spawnParticles(p.x, p.y + 3.5, p.z, 0xff5555, 20, 7);
+    health = Math.min(maxHp, health + 60);   // 击杀 Boss 回血 60
+    grenadeAmmo += 3;                          // 补充手雷 3 颗
+    mags.rifle = WEAPONS.rifle.mag;            // 补满所有武器弹药
+    mags.shotgun = WEAPONS.shotgun.mag;
+    mags.sniper = WEAPONS.sniper.mag;
+    mags.pistol = WEAPONS.pistol.mag;
+    mags.rocket = WEAPONS.rocket.mag;
+    gainXP(100);                               // Boss 击杀 +100xp
+    banner("✦ Boss 已击杀！生命+60 弹药补满 ✦");
+  } else {
+    const c1 = m.type === "creeper" ? 0x4caf50 : 0x5da85d;
+    const c2 = m.type === "creeper" ? 0x2e7d32 : 0x2e8b2e;
+    spawnParticles(p.x, p.y + 1.2, p.z, c1, 8, 3.5);
+    spawnParticles(p.x, p.y + 0.8, p.z, c2, 8, 3);
+  }
   scene.remove(m.g);
   mobs.splice(i, 1);
   sfx.kill();
   kills++;
-  score += m.type === "creeper" ? 15 : 10;
+  score += m.isBoss ? 200 : (m.type === "creeper" ? 15 : 10);
   // 击杀提示 + 统计（cause 由 m.lastHitBy 携带，默认当前武器）
   const cause = m.lastHitBy || cur;
   const wpnName = cause === "grenade" ? "手雷" : cause === "melee" ? "近战" : WEAPONS[cause] ? WEAPONS[cause].name : "武器";
@@ -1373,6 +1495,7 @@ function updateMobs(dt) {
     else if (m.type === "creeper" && m.fuse <= 0 && dist < 2.3) m.state = "attack";
     else if (m.type === "skeleton" && dist < 14 && dist > 4) m.state = "attack"; // P6.2：骷髅远程攻击距离
     else if (m.type === "spider" && dist < 1.4) m.state = "attack";
+    else if (m.isBoss && dist < 3.5) m.state = "attack";   // P6.3：Boss 近身攻击距离
     else if (dist < 1.6) m.state = "attack";
     else if (dist > 28) m.state = "wander";
     else m.state = "chase";
@@ -1493,6 +1616,51 @@ function updateMobs(dt) {
         p.x = Math.max(1.3, Math.min(W - 1.3, p.x));
         p.z = Math.max(1.3, Math.min(D - 1.3, p.z));
         sfx.hiss();
+      }
+    } else if (m.isBoss) {
+      // P6.3：Boss 多阶段行为
+      // 阶段切换：根据 HP 比例切阶段，并调整属性
+      const hpRatio = m.hp / m.maxHp;
+      if (m.phase === 1 && hpRatio < 0.6) {
+        m.phase = 2; m.speed = 2.0; m.summonCd = 0; banner("⚠ Boss 进入阶段2：震地攻击 ⚠");
+      } else if (m.phase === 2 && hpRatio < 0.3) {
+        m.phase = 3; m.speed = 2.8; m.slamCd = 0; banner("⚠ Boss 进入阶段3：狂暴 ⚠");
+      }
+      m.atkCd -= dt;
+      // 近身攻击（所有阶段）
+      if (m.state === "attack" && dist < 3.5 && m.atkCd <= 0) {
+        m.atkCd = m.phase === 3 ? 0.8 : 1.5;  // 阶段3 攻速翻倍
+        damagePlayer(m.phase === 3 ? 25 : 18);
+      }
+      // 阶段1：周期召唤 2 只小怪
+      m.summonCd -= dt;
+      if (m.phase === 1 && m.summonCd <= 0 && mobs.length < 30) {
+        m.summonCd = 8;
+        const sx = p.x + (Math.random() - 0.5) * 4;
+        const sz = p.z + (Math.random() - 0.5) * 4;
+        spawnMobAt("zombie", sx, sz);
+        spawnMobAt("zombie", sx + 1, sz + 1);
+        spawnParticles(p.x, p.y + 2, p.z, 0x5da85d, 10, 4);
+      }
+      // 阶段2：震地范围攻击——5 距离内造成伤害 + 屏幕震动
+      m.slamCd -= dt;
+      if (m.phase === 2 && m.slamCd <= 0 && dist < 8) {
+        m.slamCd = 5;
+        if (dist < 5) { damagePlayer(15); shakeT = Math.max(shakeT, 0.5); }
+        spawnParticles(p.x, p.y + 0.3, p.z, 0x8b4513, 20, 5);
+        sfx.explode();
+      }
+      // 阶段3：周期投掷火球——远程追踪伤害
+      m.fireballCd -= dt;
+      if (m.phase === 3 && m.fireballCd <= 0 && dist < 20) {
+        m.fireballCd = 3.5;
+        const hitChance = Math.min(0.6, 0.3 + (20 - dist) / 20 * 0.3);
+        if (Math.random() < hitChance) {
+          damagePlayer(20);
+          sfx.hurt();
+        }
+        addTracer(new THREE.Vector3(p.x, p.y + 3, p.z), new THREE.Vector3(pos.x, pos.y + 1.2, pos.z));
+        spawnParticles(pos.x, pos.y + 1.5, pos.z, 0xff5533, 12, 4);
       }
     } else {
       m.atkCd -= dt;
@@ -1823,11 +1991,18 @@ function drawMinimap() {
   for (const d of drops) {
     ctx.fillRect(d.m.position.x * scale - 1, d.m.position.z * scale - 1, 2, 2);
   }
-  // 怪物（红点）
-  ctx.fillStyle = "#ff4444";
+  // 怪物（红点）+ Boss（大金点带红边）
   for (const m of mobs) {
     const p = m.g.position;
-    ctx.fillRect(p.x * scale - 1.5, p.z * scale - 1.5, 3, 3);
+    if (m.isBoss) {
+      ctx.fillStyle = "#ffd833";
+      ctx.fillRect(p.x * scale - 3, p.z * scale - 3, 6, 6);
+      ctx.fillStyle = "#ff3333";
+      ctx.fillRect(p.x * scale - 2, p.z * scale - 2, 4, 4);
+    } else {
+      ctx.fillStyle = "#ff4444";
+      ctx.fillRect(p.x * scale - 1.5, p.z * scale - 1.5, 3, 3);
+    }
   }
   // 玩家（白三角朝向）
   ctx.save();
@@ -1852,6 +2027,16 @@ function updateHUD() {
   else { ammoEl.innerHTML = mags[cur] + " <small>/ ∞</small>"; ammoEl.className = ""; }
   const ge = $("grenade");
   if (ge) ge.textContent = "💣 " + grenadeAmmo;
+  // P6.3：Boss 血条更新——存活时显示，死亡后隐藏
+  const boss = mobs.find(m => m.isBoss);
+  const bossBar = $("boss-bar");
+  if (boss) {
+    bossBar.style.display = "block";
+    $("boss-name").textContent = "僵尸王 Lv." + Math.floor(wave / 5) + "（阶段 " + boss.phase + "/3）";
+    $("boss-fill").style.width = Math.max(0, boss.hp / boss.maxHp * 100) + "%";
+  } else {
+    bossBar.style.display = "none";
+  }
 }
 
 // 热键栏
@@ -2205,7 +2390,9 @@ function updateWave(dt) {
         waveState = "fighting";
         const count = Math.min(4 + wave * 2, 24);
         for (let i = 0; i < count; i++) spawnMob(wave);
-        banner("第 " + wave + " 波来袭！");
+        // P6.3：每 5 波（第5/10/15...波）额外生成 Boss
+        if (wave % 5 === 0) spawnBoss(wave);
+        banner("第 " + wave + " 波来袭！" + (wave % 5 === 0 ? " ⚠ 含 Boss ⚠" : ""));
         sfx.wave();
         updateHUD();
       }
